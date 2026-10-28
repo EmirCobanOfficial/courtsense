@@ -93,3 +93,7 @@ Upload a video, set the analysis start and end, wait for SAM 3.1, click the four
 ## Privacy
 
 Training videos and SAM outputs stay in `data/`, which is git-ignored. The players consented to the recording being used for this project.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The `@meta-sam/*` packages it depends on are under Meta's SAM License.
