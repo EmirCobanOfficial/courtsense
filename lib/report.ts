@@ -1,6 +1,7 @@
 // Coach report: Muse Spark turns the session's numbers into a short write-up in the coach's language.
 // It is written from the same views the assistant's tools return and lists every number as a claim, checked like the
-// assistant's answers (claims.ts). One rewrite with the problems found; after that the report is kept but marked unverified.
+// assistant's answers (claims.ts). One rewrite with the problems found; after that, or if the rewrite call fails, the
+// report is kept but marked unverified.
 import OpenAI from "openai";
 import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { verify, type Player, type Problem } from "./claims.ts";
@@ -43,28 +44,34 @@ function metaClient(): Client {
 }
 
 export async function writeReport(s: Session, lang: Lang = "en", client: Client = metaClient()): Promise<{ text: string; verified: boolean; problems: Problem[] }> {
-  const input: ResponseInputItem[] = [{ role: "user", content: JSON.stringify(reportData(s)) }];
+  const data = JSON.stringify(reportData(s));
   const rough = Object.fromEntries(s.metrics.map((m) => [m.player, !m.reliable])) as Record<Player, boolean>;
-  let last: { text: string; problems: Problem[] } | null = null;
+  let last: { text: string; problems: Problem[]; submitted: unknown } | null = null;
   let status = "";
   for (let i = 0; i < ATTEMPTS; i++) {
-    const res = await client.responses.create({
-      model: "muse-spark-1.3",
-      instructions: instructions(lang),
-      input,
-      tools: [TOOL],
-      parallel_tool_calls: false,
-      store: false,
-      include: ["reasoning.encrypted_content"], // stateless: reasoning comes back with the output and is replayed on the rewrite
-      reasoning: { effort: "medium" },
-      max_output_tokens: 16000, // reasoning tokens count here too; 4000 ran out before any text on a full session
-    });
+    // a rewrite starts fresh from the refused report and its problems: replaying the first attempt's reasoning costs more than it helps
+    const input: ResponseInputItem[] = [{ role: "user", content: data }];
+    if (last) input.push({ role: "user", content: `Your report was refused:\n${last.problems.map((p) => `- ${p.subject}: ${p.why}`).join("\n")}\nFix these and call submit_report again. What you submitted: ${JSON.stringify(last.submitted)}` });
+    let res: OpenAI.Responses.Response;
+    try {
+      res = await client.responses.create({
+        model: "muse-spark-1.3",
+        instructions: instructions(lang),
+        input,
+        tools: [TOOL],
+        parallel_tool_calls: false,
+        store: false,
+        reasoning: { effort: "medium" },
+        max_output_tokens: 16000, // reasoning tokens count here too; 4000 ran out before any text on a full session
+      });
+    } catch (e) {
+      if (last) return { text: last.text, problems: last.problems, verified: false }; // keep the report already paid for
+      throw e;
+    }
     status = `status ${res.status}${res.incomplete_details ? `, ${res.incomplete_details.reason}` : ""}`;
-    input.push(...(res.output as ResponseInputItem[]));
     const call = res.output.find((o) => o.type === "function_call");
     if (!call) {
-      if (res.output_text) last = { text: res.output_text, problems: [{ subject: "report", why: "its numbers were not listed as claims" }] };
-      input.push({ role: "user", content: "Submit the report with submit_report, listing every number in it as a claim." });
+      if (res.output_text) last = { text: res.output_text, problems: [{ subject: "report", why: "its numbers were not listed as claims" }], submitted: { markdown: res.output_text } };
       continue;
     }
     let args: Record<string, unknown> = {};
@@ -74,9 +81,8 @@ export async function writeReport(s: Session, lang: Lang = "en", client: Client 
     const text = String(args.markdown ?? "").trim();
     const problems = text ? verify(text, Array.isArray(args.claims) ? args.claims : [], s.facts, { lang, rough }) : [{ subject: "report", why: "empty report" }];
     if (!problems.length) return { text, verified: true, problems };
-    if (text) last = { text, problems };
-    input.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify({ error: `Refused. ${problems.map((p) => `${p.subject}: ${p.why}`).join("; ")}. Fix these, then call submit_report again.` }) });
+    if (text) last = { text, problems, submitted: args };
   }
   if (!last) throw new Error(`Muse Spark returned no report (${status})`);
-  return { ...last, verified: false };
+  return { text: last.text, problems: last.problems, verified: false };
 }

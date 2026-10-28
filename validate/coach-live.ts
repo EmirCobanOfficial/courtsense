@@ -105,18 +105,6 @@ process.on("exit", () => {
   console.log(`\n${JSON.stringify(summary)}\nsaved ${file} (git-ignored)`);
 });
 
-if (process.argv.includes("--report")) {
-  const before = { usd: ledger.spentUsd, calls: ledger.calls };
-  try {
-    const r = await writeReport(s, "en", client);
-    report = { ...r };
-  } catch (e) {
-    if (!(e instanceof BudgetError)) throw e;
-    stopped = `report: ${e.message}`;
-  }
-  report = { ...report, requests: ledger.calls - before.calls, costUsd: +(ledger.spentUsd - before.usd).toFixed(4) };
-  console.log(`report: ${report.verified === undefined ? "none" : report.verified ? "verified" : "NOT verified"}, ${report.requests} requests, $${report.costUsd}`);
-}
 for (const q of QUESTIONS) {
   if (stopped) break;
   const before = { usd: ledger.spentUsd, calls: ledger.calls };
@@ -142,4 +130,18 @@ for (const q of QUESTIONS) {
   });
   const r = results.at(-1)!;
   console.log(`${q.id}: ${r.verified === null ? "no answer" : r.verified ? "verified" : "NOT verified"}, ${r.requests} requests, $${r.costUsd}, flags ${(r.flags as string[]).length}`);
+}
+
+// last: questions first keeps the comparison with Phase 0 when the cap runs out
+if (process.argv.includes("--report") && !stopped) {
+  const before = { usd: ledger.spentUsd, calls: ledger.calls };
+  try {
+    const r = await writeReport(s, "en", client);
+    report = { ...r };
+  } catch (e) {
+    if (!(e instanceof BudgetError)) throw e;
+    stopped = `report: ${e.message}`;
+  }
+  report = { ...report, requests: ledger.calls - before.calls, costUsd: +(ledger.spentUsd - before.usd).toFixed(4) };
+  console.log(`report: ${report.verified === undefined ? "none" : report.verified ? "verified" : "NOT verified"}, ${report.requests} requests, $${report.costUsd}`);
 }

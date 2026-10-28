@@ -29,7 +29,12 @@ const session = loadSession(job, tracks, "/nonexistent.mp4");
 const distA = Math.round(session.metrics[0].distanceM);
 const fake = (replies: unknown[]) => {
   const bodies: Record<string, unknown>[] = [];
-  const client = { responses: { create: async (body: Record<string, unknown>) => (bodies.push(structuredClone(body)), replies.shift()) } } as unknown as OpenAI;
+  const next = () => {
+    const r = replies.shift();
+    if (r instanceof Error) throw r;
+    return r;
+  };
+  const client = { responses: { create: async (body: Record<string, unknown>) => (bodies.push(structuredClone(body)), next()) } } as unknown as OpenAI;
   return { client, bodies };
 };
 
@@ -103,4 +108,9 @@ test("writeReport: a refused report is rewritten once with the problems, then ma
   const no = fake([bad, structuredClone(bad)]);
   const r = await writeReport(session, "en", no.client);
   assert.deepEqual([r.verified, r.problems.map((p) => p.subject)], [false, ["999 m"]]);
+  // the rewrite starts fresh: the data, then the problems and what was submitted
+  assert.equal((no.bodies[1].input as unknown[]).length, 2);
+  // a failed rewrite call keeps the first report, unverified
+  const failed = await writeReport(session, "en", fake([bad, new Error("budget")]).client);
+  assert.deepEqual([failed.text, failed.verified], ["## Player A\n- Ran 999 m.", false]);
 });
