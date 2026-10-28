@@ -26,8 +26,8 @@
    ]
   ],
   "tracksSha256": "4ca58e0e02df0290be38e156f1c4047fe3ecec80430b3e19b8736a5318dcdc08",
-  "commit": "8825f46",
-  "generatedAt": "2026-10-28T21:22:14.377Z"
+  "commit": "347f4b8",
+  "generatedAt": "2026-10-28T21:50:36.770Z"
  },
  "result": {
   "metrics": [
@@ -1602,27 +1602,77 @@
      {
       "sourceTime": "6:44",
       "sourceSec": 404.6,
-      "speedMs": 3.81
+      "speedMs": 3.81,
+      "from": {
+       "side": "near",
+       "zone": "behindBaseline",
+       "lateral": "left"
+      },
+      "to": {
+       "side": "near",
+       "zone": "baseline",
+       "lateral": "left"
+      }
      },
      {
       "sourceTime": "9:56",
       "sourceSec": 596.3,
-      "speedMs": 3.49
+      "speedMs": 3.49,
+      "from": {
+       "side": "near",
+       "zone": "baseline",
+       "lateral": "right"
+      },
+      "to": {
+       "side": "near",
+       "zone": "midCourt",
+       "lateral": "right"
+      }
      },
      {
       "sourceTime": "4:24",
       "sourceSec": 264.1,
-      "speedMs": 3.35
+      "speedMs": 3.35,
+      "from": {
+       "side": "near",
+       "zone": "midCourt",
+       "lateral": "center"
+      },
+      "to": {
+       "side": "near",
+       "zone": "net",
+       "lateral": "center"
+      }
      },
      {
       "sourceTime": "7:50",
       "sourceSec": 470.7,
-      "speedMs": 3.08
+      "speedMs": 3.08,
+      "from": {
+       "side": "near",
+       "zone": "behindBaseline",
+       "lateral": "center"
+      },
+      "to": {
+       "side": "near",
+       "zone": "behindBaseline",
+       "lateral": "left"
+      }
      },
      {
       "sourceTime": "11:31",
       "sourceSec": 691.5,
-      "speedMs": 2.98
+      "speedMs": 2.98,
+      "from": {
+       "side": "near",
+       "zone": "behindBaseline",
+       "lateral": "right"
+      },
+      "to": {
+       "side": "near",
+       "zone": "baseline",
+       "lateral": "center"
+      }
      }
     ]
    },
@@ -1701,27 +1751,67 @@
      {
       "sourceTime": "13:43",
       "sourceSec": 823.3,
-      "speedMs": 7.93
+      "speedMs": 7.93,
+      "from": {
+       "side": "far",
+       "lateral": "center"
+      },
+      "to": {
+       "side": "far",
+       "lateral": "center"
+      }
      },
      {
       "sourceTime": "4:30",
       "sourceSec": 270.7,
-      "speedMs": 6.67
+      "speedMs": 6.67,
+      "from": {
+       "side": "far",
+       "lateral": "center"
+      },
+      "to": {
+       "side": "far",
+       "lateral": "center"
+      }
      },
      {
       "sourceTime": "3:52",
       "sourceSec": 232.9,
-      "speedMs": 6.58
+      "speedMs": 6.58,
+      "from": {
+       "side": "far",
+       "lateral": "center"
+      },
+      "to": {
+       "side": "far",
+       "lateral": "center"
+      }
      },
      {
       "sourceTime": "13:40",
       "sourceSec": 820.3,
-      "speedMs": 6.33
+      "speedMs": 6.33,
+      "from": {
+       "side": "far",
+       "lateral": "center"
+      },
+      "to": {
+       "side": "far",
+       "lateral": "center"
+      }
      },
      {
       "sourceTime": "6:54",
       "sourceSec": 414.3,
-      "speedMs": 6.1
+      "speedMs": 6.1,
+      "from": {
+       "side": "far",
+       "lateral": "center"
+      },
+      "to": {
+       "side": "far",
+       "lateral": "center"
+      }
      }
     ],
     "warning": "Depth-based, rough for this player."

@@ -12,7 +12,9 @@ export async function GET(req: Request, ctx: RouteContext<"/api/jobs/[id]">) {
   // report.md is the first, Turkish-only version
   const reportFile = [jobFile(id, `report.${lang}.md`), ...(lang === "tr" ? [jobFile(id, "report.md")] : [])].find((f) => fs.existsSync(f));
   const report = reportFile ? fs.readFileSync(reportFile, "utf8") : null;
-  return Response.json({ job, metrics: tracks ? analyze(tracks, job.calibration!) : null, report });
+  const check = reportFile?.replace(/\.md$/, ".json"); // reports written before the claim check have none: verified unknown
+  const reportVerified = check && fs.existsSync(check) ? JSON.parse(fs.readFileSync(check, "utf8")).verified === true : null;
+  return Response.json({ job, metrics: tracks ? analyze(tracks, job.calibration!) : null, report, reportVerified });
 }
 
 // Retry processing; finished steps are skipped.

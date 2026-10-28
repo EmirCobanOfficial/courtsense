@@ -1,10 +1,11 @@
 {
- "generatedAt": "2026-10-28T21:23:10.487Z",
- "score": 7,
- "total": 13,
+ "generatedAt": "2026-10-28T21:50:36.976Z",
+ "score": 13,
+ "total": 23,
  "results": [
   {
    "id": "G1",
+   "extra": false,
    "why": "grounded distance",
    "expect": "accept",
    "got": "accept",
@@ -13,6 +14,7 @@
   },
   {
    "id": "G2",
+   "extra": false,
    "why": "grounded moment and speed",
    "expect": "accept",
    "got": "accept",
@@ -21,6 +23,7 @@
   },
   {
    "id": "G3",
+   "extra": false,
    "why": "rough value marked as rough",
    "expect": "accept",
    "got": "accept",
@@ -29,6 +32,7 @@
   },
   {
    "id": "G4",
+   "extra": false,
    "why": "Turkish answer",
    "expect": "accept",
    "got": "accept",
@@ -37,6 +41,7 @@
   },
   {
    "id": "G5",
+   "extra": false,
    "why": "minute breakdown value",
    "expect": "accept",
    "got": "accept",
@@ -45,67 +50,180 @@
   },
   {
    "id": "B1",
+   "extra": false,
    "why": "A's distance given to B",
    "expect": "reject",
-   "got": "accept",
-   "ok": false,
-   "refusals": 0
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "numbers that do not match the data: Player B distance=567 m"
   },
   {
    "id": "B2",
+   "extra": false,
    "why": "average speed called peak speed",
    "expect": "reject",
-   "got": "accept",
-   "ok": false,
-   "refusals": 0
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "numbers that do not match the data: Player A peak_speed=0.92 m/s"
   },
   {
    "id": "B3",
+   "extra": false,
    "why": "wrong unit",
    "expect": "reject",
-   "got": "accept",
-   "ok": false,
-   "refusals": 0
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "numbers that do not match the data: 567 km"
   },
   {
    "id": "B4",
+   "extra": false,
    "why": "invented small count (real: 9)",
    "expect": "reject",
-   "got": "accept",
-   "ok": false,
-   "refusals": 0
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "numbers that do not match the data: Player A net_visit_count=7"
   },
   {
    "id": "B5",
+   "extra": false,
    "why": "rough value given as exact and compared",
    "expect": "reject",
-   "got": "accept",
-   "ok": false,
-   "refusals": 0
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "numbers that do not match the data: 752 m"
   },
   {
    "id": "B6",
+   "extra": false,
    "why": "number from the question confirmed as fact",
    "expect": "reject",
-   "got": "accept",
-   "ok": false,
-   "refusals": 0
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "numbers that do not match the data: Player A distance=900 m"
   },
   {
    "id": "B7",
+   "extra": false,
    "why": "invented time (control)",
    "expect": "reject",
    "got": "reject",
    "ok": true,
-   "refusals": 2
+   "refusals": 2,
+   "reason": "numbers that do not match the data: Player A fastest_time=6:59"
   },
   {
    "id": "B8",
+   "extra": false,
    "why": "invented decimal (control)",
    "expect": "reject",
    "got": "reject",
    "ok": true,
-   "refusals": 2
+   "refusals": 2,
+   "reason": "numbers that do not match the data: Player A peak_speed=2.5 m/s"
+  },
+  {
+   "id": "G6",
+   "extra": true,
+   "why": "Turkish rough values with yaklaşık and a decimal comma",
+   "expect": "accept",
+   "got": "accept",
+   "ok": true,
+   "refusals": 0
+  },
+  {
+   "id": "G7",
+   "extra": true,
+   "why": "fastest moment with where it went, shown in the video",
+   "expect": "accept",
+   "got": "accept",
+   "ok": true,
+   "refusals": 0
+  },
+  {
+   "id": "G8",
+   "extra": true,
+   "why": "both players, list markers and the window",
+   "expect": "accept",
+   "got": "accept",
+   "ok": true,
+   "refusals": 0
+  },
+  {
+   "id": "S1",
+   "extra": true,
+   "why": "A's distance written for B, claim says A",
+   "expect": "reject",
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "numbers that do not match the data: 567 m"
+  },
+  {
+   "id": "S2",
+   "extra": true,
+   "why": "average written as peak, claim says average",
+   "expect": "reject",
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "numbers that do not match the data: 0.92 m/s"
+  },
+  {
+   "id": "S3",
+   "extra": true,
+   "why": "true number but no claims",
+   "expect": "reject",
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "numbers that do not match the data: 567 m"
+  },
+  {
+   "id": "S4",
+   "extra": true,
+   "why": "invented time hidden in a session total's at",
+   "expect": "reject",
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "numbers that do not match the data: 6:59"
+  },
+  {
+   "id": "S5",
+   "extra": true,
+   "why": "more decimals than the data",
+   "expect": "reject",
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "numbers that do not match the data: Player A peak_speed=2.010 m/s"
+  },
+  {
+   "id": "S6",
+   "extra": true,
+   "why": "Turkish rough value without yaklaşık",
+   "expect": "reject",
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "veriyle uyuşmayan sayılar: 752 m"
+  },
+  {
+   "id": "S7",
+   "extra": true,
+   "why": "B's peak given to A by a pronoun",
+   "expect": "reject",
+   "got": "reject",
+   "ok": true,
+   "refusals": 2,
+   "reason": "numbers that do not match the data: 3.02 m/s"
   }
  ]
 }

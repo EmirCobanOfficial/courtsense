@@ -1,6 +1,7 @@
 // Koç asistanı: a Muse Spark 1.3 agent that answers the coach from this session's data.
 // Same shape as Meta's legal-agent-workshop loop: the model picks one tool per turn, our code runs it and
 // sends the result back; the check that every number is grounded sits inside the answer tool, so the model cannot skip it.
+// The answer lists each number as a claim (player, metric, value, unit); claims.ts checks them against the session's facts.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -9,7 +10,8 @@ import { promisify } from "node:util";
 import type OpenAI from "openai";
 import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { COURT } from "./court.ts";
-import { analyze, playerPositions, type PlayerMetrics, type PlayerPositions, type Tracks } from "./metrics.ts";
+import { METRICS, verify, type Fact, type Metric, type Player, type Problem } from "./claims.ts";
+import { analyze, place, playerPositions, type PlayerMetrics, type PlayerPositions, type Sample, type Tracks } from "./metrics.ts";
 import type { Lang } from "./i18n.ts";
 import type { Job } from "./jobs.ts";
 
@@ -21,7 +23,7 @@ export type CoachEvent =
   | { type: "error"; message: string }
   | { type: "done"; turns: number; usage: { input: number; output: number }; costUsd: number };
 
-export type Session = { job: Job; tracks: Tracks; metrics: PlayerMetrics[]; positions: PlayerPositions[]; clip: string };
+export type Session = { job: Job; tracks: Tracks; metrics: PlayerMetrics[]; positions: PlayerPositions[]; clip: string; facts: Fact[] };
 type Client = Pick<OpenAI, "responses">;
 
 const MODEL = "muse-spark-1.3";
@@ -37,14 +39,28 @@ Work with tools, exactly one call per turn:
 - get_metrics, find_moments and minute_breakdown give you numbers. Every number in your answer must come from a tool result.
 - When you talk about a specific moment, call show_moment for the most relevant one so the coach sees it in the video.
 - look_at_clip lets you watch a few seconds (at most 2 times per question); only report what is visible.
-- Finish with answer(text): ${lang === "tr" ? "Turkish" : "English"}, brief (at most ~120 words), times as m:ss of the video, players as ${lang === "tr" ? '"Oyuncu A" / "Oyuncu B"' : '"Player A" / "Player B"'}.
-Rules: never claim shots, scores or technique; if a player's reliable is false, call their distance, speed and zones rough (${lang === "tr" ? "\"yaklaşık\"" : "\"about\", \"rough\""}) and do not compare them as exact; no medical or injury advice; if the data cannot answer the question, say so.`;
+- Finish with answer(text, claims): ${lang === "tr" ? "Turkish" : "English"}, brief (at most ~120 words), times as m:ss of the video, players as ${lang === "tr" ? '"Oyuncu A" / "Oyuncu B"' : '"Player A" / "Player B"'}.
+${CLAIM_RULES(lang)}
+Rules: never claim shots, scores or technique; no medical or injury advice; if the data cannot answer the question, say so.`;
+
+// How every number reaching the coach must be stated; shared with the report prompt.
+export const CLAIM_RULES = (lang: Lang) => `Numbers: list every number you write in the text as a claim {player, metric, value, unit, at}.
+- metric: ${Object.keys(METRICS).join(", ")}. unit: m (distance), m/s (speed), % (shares), s (durations), time (m:ss), count.
+- player: A or B; leave it out for window_start, window_end and shown_time (a moment you showed or watched).
+- value: the number as you wrote it, from the data, with the same or fewer decimals (0.92 may become 0.9); whole numbers stay as they are. Never repeat a number from the question that the data does not give.
+- at: the moment's start (m:ss) for minute_distance, fastest_*, run_*, net_visit_*.
+- Name the player before their numbers, in the same sentence (${lang === "tr" ? '"Oyuncu A 400 m koştu"' : '"Player A ran 400 m"'}). Write numbers that are not data in words (${lang === "tr" ? '"üç an", "ikinci dakika"' : '"three moments", "the second minute"'}).
+- If a player's reliable is false, write ${lang === "tr" ? '"yaklaşık"' : '"about"'} in every sentence with their distance, speed, zone or net-visit numbers, and do not compare those as exact.`;
 
 const PLAYER = { type: "string", enum: ["A", "B"] };
+export const CLAIMS = { type: "array", items: { type: "object", properties: {
+  player: PLAYER, metric: { type: "string", enum: Object.keys(METRICS) }, value: { type: ["number", "string"] },
+  unit: { type: "string", enum: ["m", "m/s", "%", "s", "time", "count"] }, at: { type: "string" },
+}, required: ["metric", "value", "unit"], additionalProperties: false } };
 const TOOLS = [
   { name: "get_metrics", description: "Session metrics for one or both players: tracked time, distance, speeds, zone shares, left/center/right, reliability.",
     parameters: { type: "object", properties: { player: PLAYER }, required: [], additionalProperties: false } },
-  { name: "find_moments", description: "Find moments in the session: fastest (top 1 s speeds), longest_run (longest continuous runs), net_visits (stays inside the service box).",
+  { name: "find_moments", description: "Find moments in the session: fastest (top 1 s speeds, with where the player ran from and to: side, zone and left/center/right from the player's view; zone only when their depth is reliable), longest_run (longest continuous runs), net_visits (stays inside the service box).",
     parameters: { type: "object", properties: { player: PLAYER, kind: { type: "string", enum: ["fastest", "longest_run", "net_visits"] }, limit: { type: "integer", minimum: 1, maximum: 5 } }, required: ["player", "kind"], additionalProperties: false } },
   { name: "minute_breakdown", description: "Meters run in each full minute of the session.",
     parameters: { type: "object", properties: { player: PLAYER }, required: ["player"], additionalProperties: false } },
@@ -52,40 +68,64 @@ const TOOLS = [
     parameters: { type: "object", properties: { sourceSec: { type: "number" }, label: { type: "string" } }, required: ["sourceSec", "label"], additionalProperties: false } },
   { name: "look_at_clip", description: "Watch 2-8 seconds of the video from a moment and answer a question about what is visible.",
     parameters: { type: "object", properties: { sourceSec: { type: "number" }, seconds: { type: "number", minimum: 2, maximum: 8 }, question: { type: "string" } }, required: ["sourceSec", "seconds", "question"], additionalProperties: false } },
-  { name: "answer", description: "Give the final answer. Refused if it contains numbers that no tool returned.",
-    parameters: { type: "object", properties: { text: { type: "string" } }, required: ["text"], additionalProperties: false } },
+  { name: "answer", description: "Give the final answer with every number in it listed as a claim. Refused when a claim does not match the session data, or the text has a number without a claim, next to the wrong player, in the wrong unit, or a rough value not marked as rough.",
+    parameters: { type: "object", properties: {
+      text: { type: "string" }, claims: CLAIMS,
+    }, required: ["text", "claims"], additionalProperties: false } },
 ].map((t) => ({ type: "function" as const, strict: false, ...t }));
 
 export function loadSession(job: Job, tracks: Tracks, clip: string): Session {
-  return { job, tracks, clip, metrics: analyze(tracks, job.calibration!), positions: playerPositions(tracks, job.calibration!) };
+  const s: Session = { job, tracks, clip, metrics: analyze(tracks, job.calibration!), positions: playerPositions(tracks, job.calibration!), facts: [] };
+  s.facts = sessionFacts(s);
+  return s;
+}
+
+const ZONE_METRIC = { behindBaseline: "zone_behind_baseline", baseline: "zone_baseline", midCourt: "zone_mid_court", net: "zone_net" } as const;
+
+// Every value the tools can show, rounded the way they show it: what the claims of answers and reports are checked against.
+export function sessionFacts(s: Session): Fact[] {
+  const facts: Fact[] = [];
+  const add = (player: Player | null, metric: Metric, value: number | string, decimals = 0, at?: string) => facts.push({ player, metric, value, decimals, at });
+  add(null, "window_start", mmss(s.job.startSec));
+  add(null, "window_end", mmss(windowEnd(s)));
+  for (const m of s.metrics) {
+    const p = m.player, v = playerMetricsView(s, m);
+    add(p, "tracked_time", v.tracked);
+    add(p, "coverage", v.coveragePct);
+    add(p, "distance", v.distanceM);
+    add(p, "avg_speed", v.avgSpeedMs, 2);
+    add(p, "peak_speed", v.peakSpeedMs, 2);
+    add(p, "depth_noise", v.depthNoiseM, 2);
+    for (const [k, metric] of Object.entries(ZONE_METRIC)) add(p, metric, v.zonesPct[k]);
+    for (const k of ["left", "center", "right"]) add(p, `lateral_${k}` as Metric, v.lateralPct[k]);
+    v.sideChanges.forEach((t) => add(p, "side_change_time", t));
+    m.perMinuteM.forEach((meters, i) => add(p, "minute_distance", meters, 1, mmss(s.job.startSec + i * 60)));
+    for (const x of findMoments(s, p, "fastest", 5).moments) {
+      add(p, "fastest_speed", x.speedMs!, 2, x.sourceTime);
+      add(p, "fastest_time", x.sourceTime);
+    }
+    for (const x of findMoments(s, p, "longest_run", 5).moments) {
+      add(p, "run_distance", x.distanceM!, 1, x.sourceTime);
+      add(p, "run_duration", x.durationS!, 1, x.sourceTime);
+      add(p, "run_time", x.sourceTime);
+    }
+    const net = findMoments(s, p, "net_visits", 5);
+    add(p, "net_visit_count", net.count!);
+    for (const x of net.moments) {
+      add(p, "net_visit_duration", x.durationS!, 1, x.sourceTime);
+      add(p, "net_visit_time", x.sourceTime);
+    }
+  }
+  return facts;
 }
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const r = (v: number, d: number) => +v.toFixed(d);
 const pct = (v: number) => Math.round(v * 100);
 
-// Numbers the coach reads must appear in tool results (or the question): "0,93", "%68", "578", "6:46".
-// Small counts (0-10) are free; a value written with fewer decimals matches the tool value rounded that way.
-export function ungrounded(text: string, evidence: string): string[] {
-  const times = new Set(evidence.match(/\d+:\d\d/g) ?? []);
-  const values = (evidence.replace(/\d+:\d\d/g, " ").match(/-?\d+(?:[.,]\d+)?/g) ?? []).map((n) => +n.replace(",", "."));
-  const bad: string[] = [];
-  for (const t of text.match(/\d+:\d\d/g) ?? []) if (!times.has(t)) bad.push(t);
-  for (const n of text.replace(/\d+:\d\d/g, " ").match(/\d+(?:[.,]\d+)*/g) ?? []) {
-    // Turkish writes 10.688 for ten thousand six hundred eighty-eight, so a dot before 3 digits may be a thousands separator
-    const readings = [n.replace(",", "."), ...(/^\d{1,3}(\.\d{3})+$/.test(n) ? [n.replace(/\./g, "")] : [])];
-    const ok = readings.some((s) => {
-      const v = +s;
-      const d = s.includes(".") ? s.split(".")[1].length : 0;
-      return (d === 0 && v <= 10) || values.some((e) => Math.abs(e - v) <= 0.5 * 10 ** -d + 1e-9);
-    });
-    if (!ok) bad.push(n);
-  }
-  return bad;
-}
-
 // --- tools ---
-type Ctx = { s: Session; emit: (e: CoachEvent) => void; client: Client; signal?: AbortSignal; looks: number };
+type Ctx = { s: Session; emit: (e: CoachEvent) => void; client: Client; signal?: AbortSignal; looks: number; facts: Fact[] };
+const shown = (sec: number): Fact => ({ player: null, metric: "shown_time", value: mmss(sec), decimals: 0 });
 const src = (s: Session, clipSec: number) => s.job.startSec + clipSec;
 const windowEnd = (s: Session) => s.job.startSec + s.tracks.frames / s.tracks.fps;
 
@@ -106,16 +146,29 @@ function playerMetricsView(s: Session, m: PlayerMetrics) {
   };
 }
 
+type Place = { side: "near" | "far"; zone?: string; lateral: string };
+type Moment = { sourceTime: string; sourceSec: number; speedMs?: number; from?: Place; to?: Place; distanceM?: number; durationS?: number };
+
+// What the report is written from: the views the assistant's tools return, so its claims check against the same facts.
+export function reportData(s: Session) {
+  return {
+    video: s.job.name,
+    window: { from: mmss(s.job.startSec), to: mmss(windowEnd(s)) },
+    players: s.metrics.map((m) => ({ ...playerMetricsView(s, m), minutes: m.perMinuteM.map((meters, i) => ({ from: mmss(s.job.startSec + i * 60), meters })) })),
+  };
+}
+
 // Moments from the smoothed positions every metric uses. Times are source-video seconds.
 export function findMoments(s: Session, player: "A" | "B", kind: string, limit = 3) {
   const { fps } = s.tracks;
   const segs = s.positions[player === "A" ? 0 : 1].smoothed;
-  const found: { at: number; value: number; extra?: number }[] = [];
+  const reliable = s.metrics[player === "A" ? 0 : 1].reliable;
+  const found: { at: number; value: number; extra?: number; from?: Sample; to?: Sample }[] = [];
   for (const seg of segs) {
     if (kind === "fastest") {
       for (let i = 0, j = 0; i < seg.length; i++) {
         while (j < seg.length && seg[j].f - seg[i].f < fps) j++;
-        if (j < seg.length) found.push({ at: seg[i].f / fps, value: Math.hypot(seg[j].x - seg[i].x, seg[j].y - seg[i].y) / ((seg[j].f - seg[i].f) / fps) });
+        if (j < seg.length) found.push({ at: seg[i].f / fps, value: Math.hypot(seg[j].x - seg[i].x, seg[j].y - seg[i].y) / ((seg[j].f - seg[i].f) / fps), from: seg[i], to: seg[j] });
       }
     } else {
       // a run: consecutive samples moving faster than 1 m/s; a net visit: samples inside the service box
@@ -140,13 +193,18 @@ export function findMoments(s: Session, player: "A" | "B", kind: string, limit =
   found.sort((a, b) => b.value - a.value);
   const picked: typeof found = [];
   for (const m of found) if (picked.length < limit && picked.every((p) => Math.abs(p.at - m.at) >= 3)) picked.push(m);
-  const moments = picked.map((m) => ({
+  // where the player ran from and to; the zone rests on depth, so only when it is reliable
+  const where = (p: Sample): Place => {
+    const side = p.y < COURT.net ? "near" : "far";
+    const { zone, lateral } = place(p, side);
+    return reliable ? { side, zone, lateral } : { side, lateral };
+  };
+  const moments: Moment[] = picked.map((m) => ({
     sourceTime: mmss(src(s, m.at)),
     sourceSec: r(src(s, m.at), 1),
-    ...(kind === "fastest" ? { speedMs: r(m.value, 2) } : kind === "longest_run" ? { distanceM: r(m.value, 1), durationS: r(m.extra!, 1) } : { durationS: r(m.value, 1) }),
+    ...(kind === "fastest" ? { speedMs: r(m.value, 2), from: where(m.from!), to: where(m.to!) } : kind === "longest_run" ? { distanceM: r(m.value, 1), durationS: r(m.extra!, 1) } : { durationS: r(m.value, 1) }),
   }));
-  const reliable = s.metrics[player === "A" ? 0 : 1].reliable;
-  return { player, kind, ...(kind === "net_visits" ? { count: found.length } : {}), moments, ...(reliable ? {} : { warning: "Depth-based, rough for this player." }) };
+  return { player, kind, count: kind === "net_visits" ? found.length : undefined, moments, ...(reliable ? {} : { warning: "Depth-based, rough for this player." }) };
 }
 
 async function lookAtClip(c: Ctx, sourceSec: number, seconds: number, question: string) {
@@ -204,13 +262,16 @@ async function runTool(c: Ctx, name: string, a: Record<string, unknown>): Promis
     case "show_moment":
       if (!inWindow(a.sourceSec)) return { error: `sourceSec must be between ${s.job.startSec} and ${Math.floor(windowEnd(s))}` };
       c.emit({ type: "seek", sourceSec: Number(a.sourceSec), label: String(a.label ?? "").slice(0, 120) });
+      c.facts.push(shown(Number(a.sourceSec)));
       return { shown: true, sourceTime: mmss(Number(a.sourceSec)) };
     case "look_at_clip": {
       const seconds = Number(a.seconds);
       if (!inWindow(a.sourceSec) || !(seconds >= 2 && seconds <= 8) || !inWindow(Number(a.sourceSec) + seconds)) return { error: "sourceSec must be inside the session and seconds 2-8" };
       if (c.looks >= MAX_CLIP_LOOKS) return { error: `at most ${MAX_CLIP_LOOKS} clip looks per question` };
       c.looks++;
-      return lookAtClip(c, Number(a.sourceSec), seconds, String(a.question ?? "").slice(0, 300));
+      const seen = await lookAtClip(c, Number(a.sourceSec), seconds, String(a.question ?? "").slice(0, 300));
+      c.facts.push(shown(Number(a.sourceSec)), shown(Number(a.sourceSec) + seconds));
+      return seen;
     }
     default:
       return { error: `unknown tool ${name}` };
@@ -228,8 +289,8 @@ export async function ask(s: Session, question: string, history: { question: str
     usage.input += u?.input_tokens ?? 0;
     usage.output += u?.output_tokens ?? 0;
   };
-  const c: Ctx = { s, emit, client, signal, looks: 0 };
-  let evidence = question; // numbers the coach said may be repeated
+  const c: Ctx = { s, emit, client, signal, looks: 0, facts: [...s.facts] };
+  const rough = Object.fromEntries(s.metrics.map((m) => [m.player, !m.reliable])) as Record<Player, boolean>;
   let refusals = 0;
   let turn = 0;
   let finished = false;
@@ -262,8 +323,8 @@ export async function ask(s: Session, question: string, history: { question: str
     let result: Record<string, unknown>;
     if (call.name === "answer") {
       const text = String(args.text ?? "").trim();
-      const bad = ungrounded(text, evidence);
-      if (text && !bad.length) {
+      const problems: Problem[] = text ? verify(text, Array.isArray(args.claims) ? args.claims : [], c.facts, { lang, rough }) : [{ subject: "text", why: "empty answer" }];
+      if (!problems.length) {
         emit({ type: "answer", text, verified: true });
         result = { accepted: true };
         finished = true;
@@ -272,9 +333,9 @@ export async function ask(s: Session, question: string, history: { question: str
         result = { accepted: false };
         finished = true;
       } else {
-        const reason = lang === "tr" ? (text ? `araç sonuçlarında olmayan sayılar: ${bad.join(", ")}` : "boş cevap") : text ? `numbers not in any tool result: ${bad.join(", ")}` : "empty answer";
-        emit({ type: "refused", reason });
-        result = { error: `${reason}. Take numbers only from tool results, or leave them out, then call answer again.` };
+        const subjects = problems.map((p) => p.subject).join(", ");
+        emit({ type: "refused", reason: lang === "tr" ? (text ? `veriyle uyuşmayan sayılar: ${subjects}` : "boş cevap") : text ? `numbers that do not match the data: ${subjects}` : "empty answer" });
+        result = { error: `Refused. ${problems.map((p) => `${p.subject}: ${p.why}`).join("; ")}. Fix these, then call answer again with every number in the text listed as a claim.` };
       }
     } else {
       try {
@@ -287,7 +348,6 @@ export async function ask(s: Session, question: string, history: { question: str
         add(result.usage as Parameters<typeof add>[0]);
         delete result.usage;
       }
-      evidence += JSON.stringify(result);
     }
     input.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(result) });
   }

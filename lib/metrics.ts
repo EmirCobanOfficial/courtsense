@@ -141,15 +141,9 @@ function playerMetrics(player: "A" | "B", { objectFrames, raw: rawSegments, smoo
     const now: typeof side = s.y < COURT.net - 2 ? "near" : s.y > COURT.net + 2 ? "far" : side;
     if (side && now !== side) sideChangesAt.push(+(s.f / fps).toFixed(1));
     side = now;
-    const d = side === "far" ? COURT.length - s.y : s.y; // distance in front of own baseline
-    if (d < 0) zones.behindBaseline++;
-    else if (d < 2) zones.baseline++;
-    else if (d < COURT.serviceFromBaseline) zones.midCourt++;
-    else zones.net++;
-    const lx = side === "far" ? -s.x : s.x; // the far player faces the camera, so their left is camera right
-    if (lx < -COURT.singlesHalf / 3) lateral.left++;
-    else if (lx > COURT.singlesHalf / 3) lateral.right++;
-    else lateral.center++;
+    const p = place(s, side);
+    zones[p.zone]++;
+    lateral[p.lateral]++;
     const cx = Math.floor(s.x - HEAT.x0);
     const cy = Math.floor(s.y - HEAT.y0);
     if (cx >= 0 && cx < HEAT.cols && cy >= 0 && cy < HEAT.rows) counts[cy * HEAT.cols + cx]++;
@@ -216,3 +210,13 @@ function smooth(segs: Sample[][], half: number): Sample[][] {
 
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 const round = (v: number, d: number) => +v.toFixed(d);
+
+// Where a position is from the player's own view: zone in front of their own baseline, and third of the singles width.
+export function place(s: { x: number; y: number }, side: "near" | "far" | null) {
+  const d = side === "far" ? COURT.length - s.y : s.y; // distance in front of own baseline
+  const lx = side === "far" ? -s.x : s.x; // the far player faces the camera, so their left is camera right
+  return {
+    zone: d < 0 ? "behindBaseline" : d < 2 ? "baseline" : d < COURT.serviceFromBaseline ? "midCourt" : "net",
+    lateral: lx < -COURT.singlesHalf / 3 ? "left" : lx > COURT.singlesHalf / 3 ? "right" : "center",
+  } as const;
+}

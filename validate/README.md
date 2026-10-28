@@ -6,9 +6,9 @@ Measure CourtSense against something fixed before changing how it works. None of
 |---|---|---|
 | `node validate/snapshot.ts` | Today's results on the real session (metrics, the assistant's moments) vs. the frozen baseline. `--save` refreezes. | $0 |
 | `node validate/synthetic.ts` | Accuracy against a known ground truth: simulated sessions through the app's own `analyze()`. `--save` refreezes. | $0 |
-| `node validate/coach-eval.ts` | AI Coach test set with a scripted fake model: should a given answer reach the coach? `--save` refreezes. | $0 |
-| `node validate/coach-live.ts [--cap 0.5]` | Real Muse Spark answers on the real session, audited offline. Hard cap, at most $0.50. | ≤ cap |
-| `node --test validate/*.test.ts` | Unit tests of the budget guard. | $0 |
+| `node validate/coach-eval.ts` | AI Coach test set with a scripted fake model: should a given answer reach the coach? The 13 Phase 0 cases, plus extra cases that try to game the check. `--save` refreezes. | $0 |
+| `node validate/coach-live.ts [--cap 0.15] [--report]` | Real Muse Spark answers on the real session (and with `--report` the English report), checked by the app and audited offline. $0.50 is the total for all live runs: what earlier runs spent is subtracted first. | ≤ cap |
+| `node --test lib/*.test.ts validate/*.test.ts` | Unit tests: the claim check, the agent loop, the report rewrite, the budget guard. | $0 |
 
 `snapshot.ts`, `coach-eval.ts` and `coach-live.ts` need the session data in `data/d8650763e4d0` (git-ignored). `synthetic.ts` falls back to the noise model saved in `baseline/synthetic.json` when the data is not there.
 
@@ -33,3 +33,25 @@ The noise model is matched to the real session on three things:
 - **After each request:** it books the real usage.
 - **Failed calls:** these are charged at their worst case.
 - **Video, image and file input:** refused, because their size cannot be bounded in advance. This means `look_at_clip` does not run in live checks.
+
+## How the claim check works
+
+Every number Muse Spark writes for the coach, in an answer or in the report, must be listed as a claim: player, metric, value, unit, and the moment for timed metrics. `lib/claims.ts` checks two things:
+- **The claims.** Each claim is checked against the session's facts: the values the tools show, rounded the same way. A wrong value, player, unit or moment is refused. So is a value with more decimals than the data. Fewer decimals are fine.
+- **The text.** Every number in the text must match a claim:
+  - in the claim's unit;
+  - after the claim's player, when the sentence names one;
+  - not next to another metric's words, such as "peak" on an average;
+  - with "about" or "yaklaşık" when the player's depth is unreliable.
+
+A refused answer goes back to the model with the reasons. After three refusals the coach gets it marked as not verified. The report gets one rewrite, then it is saved with its verdict.
+
+**Limits:**
+- The text check is a heuristic.
+  - A number belongs to the last player named before it. A pronoun carries the previous sentence's player.
+  - Turkish relative clauses such as "567 m koşan Oyuncu A" are refused and must be rephrased.
+- Only numbers are checked. A comparison or conclusion in words ("more than Player A", "pace dropped") is not.
+- Numbers written as words ("seven times") are not read. The prompt asks for words only for numbers that are not data, but nothing enforces it.
+- Derived numbers are refused even when the arithmetic is right: differences, sums, ratios, per-minute averages. The model has to give the underlying values instead.
+- Whole numbers are not rounded: 570 for 567 is refused.
+- A time the assistant showed or watched (`shown_time`) is accepted as a reference. What the vision model says it saw there is not checked.

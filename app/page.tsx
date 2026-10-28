@@ -150,7 +150,7 @@ function JobView({ id, onStatus }: { id: string; onStatus: () => void }) {
   const { t, pct, lang } = useT();
   const [job, setJob] = useState<Job | null>(null);
   const [metrics, setMetrics] = useState<PlayerMetrics[] | null>(null);
-  const [report, setReport] = useState<string | null>(null);
+  const [report, setReport] = useState<ReportState | null>(null);
   const [jump, setJump] = useState<{ sourceSec: number; n: number }>();
   const status = useRef<Job["status"]>(undefined);
   const load = useCallback(
@@ -160,7 +160,7 @@ function JobView({ id, onStatus }: { id: string; onStatus: () => void }) {
         .then((d) => {
           setJob(d.job);
           setMetrics(d.metrics);
-          setReport(d.report);
+          setReport(d.report ? { text: d.report, verified: d.reportVerified } : null);
           // the video list above shows each job's status too
           if (status.current && status.current !== d.job.status) onStatus();
           status.current = d.job.status;
@@ -205,7 +205,9 @@ function JobView({ id, onStatus }: { id: string; onStatus: () => void }) {
   );
 }
 
-function Report({ id, report, onReport }: { id: string; report: string | null; onReport: (r: string) => void }) {
+type ReportState = { text: string; verified: boolean | null }; // null: written before the claim check
+
+function Report({ id, report, onReport }: { id: string; report: ReportState | null; onReport: (r: ReportState) => void }) {
   const { t, lang } = useT();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -216,7 +218,7 @@ function Report({ id, report, onReport }: { id: string; report: string | null; o
     const d = await res.json();
     setBusy(false);
     if (!res.ok) return setErr(d.error);
-    onReport(d.report);
+    onReport({ text: d.report, verified: d.verified });
   }
   return (
     <div className="space-y-3">
@@ -225,11 +227,14 @@ function Report({ id, report, onReport }: { id: string; report: string | null; o
         <button onClick={generate} disabled={busy} className="rounded bg-foreground px-3 py-1 text-sm text-background disabled:opacity-50">
           {busy ? t("writing") : report ? t("regenerate") : t("generate")}
         </button>
+        {report && report.verified !== null && (
+          <span className={`text-sm ${report.verified ? "text-green-700 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`}>{t(report.verified ? "verified" : "unverified")}</span>
+        )}
       </div>
       {err && <p className="text-sm text-red-600">{err}</p>}
       {report && (
         <div className="space-y-2 rounded-lg border border-black/10 p-4 text-sm leading-6 dark:border-white/15">
-          {report.split("\n").map((line, i) =>
+          {report.text.split("\n").map((line, i) =>
             line.startsWith("## ") ? (
               <h4 key={i} className="pt-2 font-medium">
                 {inline(line.slice(3))}

@@ -1,18 +1,24 @@
-// Live AI Coach check: real Muse Spark calls on the coach's session, under a hard budget (default and maximum $0.50).
-// Every request is priced at its worst case before it is sent (see budget.ts) and the run stops before the cap could
-// be passed. look_at_clip is refused in this mode: video input cannot be priced in advance. No SAM calls.
-// Answers are audited offline with simple rules (number attributed to the right player, rough values marked).
-// usage (from the repo root): node validate/coach-live.ts [--cap 0.5]
+// Live AI Coach check: real Muse Spark calls on the coach's session, under a hard budget. $0.50 is the total for ALL
+// live runs: the spend saved by earlier runs (data/validation/coach-live-*.json) is subtracted first, and --cap can
+// only lower this run's share. Every request is priced at its worst case before it is sent (see budget.ts) and the run
+// stops before the cap could be passed. look_at_clip is refused in this mode: video input cannot be priced in advance.
+// No SAM calls. Answers are checked by the app (claims.ts) and audited again offline with simple independent rules.
+// usage (from the repo root): node validate/coach-live.ts [--cap 0.15] [--report]   (--report: also write and check the English report)
 import fs from "node:fs";
 import OpenAI from "openai";
 import { jobFile, readJob, readTracks } from "../lib/jobs.ts";
 import { ask, loadSession, type CoachEvent } from "../lib/coach.ts";
+import { writeReport } from "../lib/report.ts";
 import { budgetClient, BudgetError } from "./budget.ts";
 
-const MAX_CAP = 0.5; // the owner's limit for this check
+const MAX_TOTAL = 0.5; // the owner's limit for all live checks together
+const DIR = "data/validation";
+const prior = (fs.existsSync(DIR) ? fs.readdirSync(DIR) : []).filter((f) => /^coach-live-.*\.json$/.test(f))
+  .reduce((sum, f) => sum + (JSON.parse(fs.readFileSync(`${DIR}/${f}`, "utf8")).summary?.spentUsd ?? 0), 0);
 const capArg = process.argv.indexOf("--cap");
-const CAP = capArg > 0 ? Number(process.argv[capArg + 1]) : MAX_CAP;
-if (!(CAP > 0 && CAP <= MAX_CAP)) throw new Error(`--cap must be in (0, ${MAX_CAP}]`);
+const CAP = +Math.min(capArg > 0 ? Number(process.argv[capArg + 1]) : Infinity, MAX_TOTAL - prior).toFixed(4);
+if (!(CAP > 0)) throw new Error(`no budget left: earlier live runs spent $${prior.toFixed(4)} of $${MAX_TOTAL}`);
+console.log(`earlier live runs: $${prior.toFixed(4)}; this run's hard cap: $${CAP} (total stays <= $${MAX_TOTAL})`);
 
 const QUESTIONS: { id: string; text: string; lang: "en" | "tr" }[] = [
   { id: "fastest", text: "Where did Player A run fastest? Show me that moment.", lang: "en" },
@@ -88,8 +94,31 @@ function audit(qid: string, text: string, input: unknown): string[] {
 // --- run ---
 const { client, ledger } = budgetClient(new OpenAI({ baseURL: "https://api.meta.ai/v1", apiKey: apiKey() }), CAP);
 const results: Record<string, unknown>[] = [];
+let report: Record<string, unknown> | null = null;
 let stopped = "";
+fs.mkdirSync(DIR, { recursive: true });
+const file = `${DIR}/coach-live-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+// saved on any exit, so the spend is on record for the next run's cap even if this one fails
+process.on("exit", () => {
+  const summary = { capUsd: CAP, priorUsd: +prior.toFixed(4), spentUsd: +ledger.spentUsd.toFixed(4), requests: ledger.calls, refusedByBudget: ledger.refused, stopped: stopped || null, questions: results.length };
+  fs.writeFileSync(file, JSON.stringify({ summary, ledger: ledger.entries, report, results }, null, 1) + "\n");
+  console.log(`\n${JSON.stringify(summary)}\nsaved ${file} (git-ignored)`);
+});
+
+if (process.argv.includes("--report")) {
+  const before = { usd: ledger.spentUsd, calls: ledger.calls };
+  try {
+    const r = await writeReport(s, "en", client);
+    report = { ...r };
+  } catch (e) {
+    if (!(e instanceof BudgetError)) throw e;
+    stopped = `report: ${e.message}`;
+  }
+  report = { ...report, requests: ledger.calls - before.calls, costUsd: +(ledger.spentUsd - before.usd).toFixed(4) };
+  console.log(`report: ${report.verified === undefined ? "none" : report.verified ? "verified" : "NOT verified"}, ${report.requests} requests, $${report.costUsd}`);
+}
 for (const q of QUESTIONS) {
+  if (stopped) break;
   const before = { usd: ledger.spentUsd, calls: ledger.calls };
   const events: CoachEvent[] = [];
   ledger.lastInput = undefined;
@@ -104,7 +133,7 @@ for (const q of QUESTIONS) {
     id: q.id,
     question: q.text,
     steps: events.filter((e) => e.type === "step").map((e) => (e as Extract<CoachEvent, { type: "step" }>).tool),
-    refusals: events.filter((e) => e.type === "refused").length,
+    refusals: events.filter((e) => e.type === "refused").map((e) => (e as Extract<CoachEvent, { type: "refused" }>).reason),
     answer: final?.text ?? null,
     verified: final?.verified ?? null,
     flags: final ? audit(q.id, final.text, ledger.lastInput) : ["no answer"],
@@ -113,11 +142,4 @@ for (const q of QUESTIONS) {
   });
   const r = results.at(-1)!;
   console.log(`${q.id}: ${r.verified === null ? "no answer" : r.verified ? "verified" : "NOT verified"}, ${r.requests} requests, $${r.costUsd}, flags ${(r.flags as string[]).length}`);
-  if (stopped) break;
 }
-
-const summary = { capUsd: CAP, spentUsd: +ledger.spentUsd.toFixed(4), requests: ledger.calls, refusedByBudget: ledger.refused, stopped: stopped || null, questions: results.length };
-fs.mkdirSync("data/validation", { recursive: true });
-const file = `data/validation/coach-live-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-fs.writeFileSync(file, JSON.stringify({ summary, ledger: ledger.entries, results }, null, 1) + "\n");
-console.log(`\n${JSON.stringify(summary)}\nsaved ${file} (git-ignored)`);
