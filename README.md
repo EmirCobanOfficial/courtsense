@@ -17,6 +17,14 @@ Demo video (3 min): https://youtu.be/fbqArD7z1YA
 | `@meta-sam/parser` | reads SAM 3.1's streamed output (boxes and masks per frame) |
 | `@meta-sam/react`, `@meta-sam/graphics` | play the session in the browser with the SAM masks drawn on it |
 
+## Why this is not a generic sports analyzer
+
+The hackathon lists sports analyzers among the projects to avoid, because so many get built. We asked the organizers before building and again before submitting (Discord #questions, Oct 27 and Oct 28). Their ruling: a tennis performance tool is fair game here because using SAM 3.1 for it is a new take, as long as it's something we actually use. The difference:
+
+- **Built for a real user.** Our coach films every practice with one camera behind the baseline. CourtSense is built around those sessions, and the coach's own voice note is in the demo.
+- **SAM 3.1 is the core.** SAM 3.1 video segmentation tracks both players through a whole session from a text prompt. There is no pose model, no training data, and no extra cameras or sensors. Four clicks turn the video into court meters.
+- **Answers a coach can check.** The Muse Spark assistant jumps the video to the moment it talks about, and every number it says is verified against the data. Rough values are marked as rough.
+
 ## What it does
 
 A club coach films practice with one fixed camera behind the baseline. CourtSense turns that footage into numbers:
