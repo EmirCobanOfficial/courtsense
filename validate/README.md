@@ -8,6 +8,8 @@ Measure CourtSense against something fixed before changing how it works. None of
 | `node validate/synthetic.ts` | Accuracy against a known ground truth: simulated sessions through the app's own `analyze()`. `--save` refreezes. | $0 |
 | `node validate/coach-eval.ts` | AI Coach test set with a scripted fake model: should a given answer reach the coach? The 13 Phase 0 cases, plus extra cases that try to game the check. `--save` refreezes. | $0 |
 | `node validate/coach-live.ts [--cap 0.15] [--report]` | Real Muse Spark answers on the real session (and with `--report` the English report), checked by the app and audited offline. $0.50 is the total for all live runs: what earlier runs spent is subtracted first. | ≤ cap |
+| `node validate/annotate/pick.ts`, then `node validate/annotate/server.ts` | Hand-marking page at http://127.0.0.1:3461: mark both players' feet in 40 frames (plus 5 shown again). Frames and marks stay in `data/` on this machine. | $0 |
+| `node validate/annotate/compare.ts` | Hand marks vs. what the app computed, per side, in meters and pixels; how repeatable the marks are. Gives no numbers until at least 10 positions are marked. `--self-check` tests the math. | $0 |
 | `node --test lib/*.test.ts validate/*.test.ts` | Unit tests: the claim check, the agent loop, the report rewrite, the budget guard. | $0 |
 
 `snapshot.ts`, `coach-eval.ts` and `coach-live.ts` need the session data in `data/d8650763e4d0` (git-ignored). `synthetic.ts` falls back to the noise model saved in `baseline/synthetic.json` when the data is not there.

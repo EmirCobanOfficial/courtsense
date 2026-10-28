@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foot marks</title>
+<style>
+  :root { --bg: #111; --fg: #eee; --muted: #9a9a9a; --a: #4fc3f7; --b: #ffb74d; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+  header { padding: 8px 12px; display: flex; gap: 6px 18px; align-items: baseline; flex-wrap: wrap; border-bottom: 1px solid #333; }
+  canvas { flex: 1; width: 100%; min-height: 0; display: block; cursor: crosshair; touch-action: none; }
+  .who { font-weight: 700; } .A { color: var(--a); } .B { color: var(--b); }
+  .muted { color: var(--muted); }
+  kbd { border: 1px solid #555; border-radius: 3px; padding: 0 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <strong id="progress"></strong>
+  <span>Marking <span id="who" class="who"></span></span>
+  <span id="status" class="muted"></span>
+  <span class="muted">Click the ground point midway between the player's feet; with one foot in the air, the planted foot.
+    Feet visible through the net mesh count; if you cannot see them, press <kbd>H</kbd>.</span>
+  <span class="muted"><kbd>A</kbd> <kbd>B</kbd> player · <kbd>H</kbd> not visible · <kbd>⌫</kbd> clear · arrows nudge 0.5 px (<kbd>Shift</kbd> 2 px) ·
+    <kbd>F</kbd> whole frame / zoom · wheel zoom · drag pan · <kbd>N</kbd> <kbd>P</kbd> next / previous frame</span>
+</header>
+<canvas id="c"></canvas>
+<script>
+// Hand-marking both players' feet. The page shows only the frame and a name tag above each player's head, never where
+// the app put the feet, so the marks stay independent. Marks are saved to the local server on every change.
+const $ = (id) => document.getElementById(id);
+const cv = $("c"), ctx = cv.getContext("2d");
+const COLOR = { A: "#4fc3f7", B: "#ffb74d" };
+let M, labels = {}, i = 0, who = "A", whole = false, view = { s: 1, x: 0, y: 0 }, drag = null, timer, img = new Image();
+const fr = () => M.frames[i];
+const marks = () => (labels[fr().id] ??= {});
+const done = (f) => labels[f.id]?.A !== undefined && labels[f.id]?.B !== undefined;
+const dpr = () => window.devicePixelRatio || 1;
+
+async function init() {
+  M = await (await fetch("/api/frames")).json();
+  labels = (await (await fetch("/api/labels")).json()).labels || {};
+  i = Math.max(0, M.frames.findIndex((f) => !done(f)));
+  addEventListener("resize", () => { fit(); focus(); });
+  fit();
+  open();
+}
+function fit() {
+  const r = cv.getBoundingClientRect();
+  cv.width = r.width * dpr();
+  cv.height = r.height * dpr();
+}
+function open() {
+  img = new Image();
+  img.onload = () => { who = marks().A === undefined ? "A" : marks().B === undefined ? "B" : "A"; focus(); };
+  img.src = "/frames/" + fr().file;
+}
+// zoom on the player being marked (their whole body fills about half the height), or show the whole frame
+function focus() {
+  const p = fr().players[who];
+  if (whole || !p) {
+    const s = Math.min(cv.width / M.width, cv.height / M.height);
+    view = { s, x: (cv.width - M.width * s) / 2, y: (cv.height - M.height * s) / 2 };
+  } else {
+    const [cx, cy, h] = p.view;
+    const s = Math.min((cv.height * 0.55) / h, 14);
+    view = { s, x: cv.width / 2 - cx * s, y: cv.height / 2 - cy * s };
+  }
+  draw();
+}
+const toScreen = ([x, y]) => [x * view.s + view.x, y * view.s + view.y];
+function toImage(e) {
+  const r = cv.getBoundingClientRect();
+  return [((e.clientX - r.left) * dpr() - view.x) / view.s, ((e.clientY - r.top) * dpr() - view.y) / view.s];
+}
+function draw() {
+  const k = dpr();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(view.s, 0, 0, view.s, view.x, view.y);
+  ctx.imageSmoothingEnabled = view.s < 3; // sharp pixels when zoomed in
+  if (img.complete) ctx.drawImage(img, 0, 0);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (const p of ["A", "B"]) {
+    const t = fr().players[p];
+    if (t) {
+      const [x, y] = toScreen(t.tag);
+      ctx.fillStyle = COLOR[p];
+      ctx.fillRect(x - 10 * k, y - 26 * k, 20 * k, 18 * k);
+      ctx.fillStyle = "#000";
+      ctx.font = `bold ${14 * k}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.fillText(p, x, y - 12 * k);
+    }
+    const m = marks()[p];
+    if (Array.isArray(m)) {
+      const [x, y] = toScreen(m), r = (p === who ? 12 : 8) * k;
+      ctx.strokeStyle = COLOR[p];
+      ctx.lineWidth = (p === who ? 2 : 1) * k;
+      ctx.beginPath();
+      ctx.moveTo(x - r, y); ctx.lineTo(x + r, y);
+      ctx.moveTo(x, y - r); ctx.lineTo(x, y + r);
+      ctx.stroke();
+    }
+  }
+  const n = M.frames.filter(done).length;
+  $("progress").textContent = n === M.frames.length
+    ? `All ${n} frames marked. Run: node validate/annotate/compare.ts`
+    : `${n}/${M.frames.length} frames marked · frame ${i + 1} (video ${fr().sourceTime})`;
+  $("who").textContent = `Player ${who}${marks()[who] === "hidden" ? " (not visible)" : ""}`;
+  $("who").className = "who " + who;
+}
+function mark(m) {
+  marks()[who] = m;
+  save();
+  if (marks()[who === "A" ? "B" : "A"] === undefined) {
+    who = who === "A" ? "B" : "A";
+    return focus();
+  }
+  draw();
+  if (done(fr())) setTimeout(() => go(M.frames.findIndex((f, j) => j > i && !done(f))), 350);
+}
+function go(j) {
+  if (j < 0 || j >= M.frames.length || j === i) return;
+  i = j;
+  open();
+}
+function save() {
+  clearTimeout(timer);
+  $("status").textContent = "saving…";
+  timer = setTimeout(async () => {
+    try {
+      const r = await fetch("/api/labels", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ labels }) });
+      $("status").textContent = r.ok ? "saved" : "save failed: " + (await r.text());
+    } catch (e) {
+      $("status").textContent = "save failed: " + e.message;
+    }
+  }, 250);
+}
+
+cv.addEventListener("pointerdown", (e) => {
+  drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (Math.hypot(dx, dy) > 4) drag.moved = true;
+  if (drag.moved) {
+    view.x = drag.vx + dx * dpr();
+    view.y = drag.vy + dy * dpr();
+    draw();
+  }
+});
+cv.addEventListener("pointerup", (e) => {
+  const d = drag;
+  drag = null;
+  if (!d || d.moved || e.button !== 0) return;
+  const [x, y] = toImage(e);
+  if (x >= 0 && y >= 0 && x <= M.width && y <= M.height) mark([+x.toFixed(2), +y.toFixed(2)]);
+});
+cv.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const [ix, iy] = toImage(e), r = cv.getBoundingClientRect();
+  view.s = Math.min(24, Math.max(0.1, view.s * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
+  view.x = (e.clientX - r.left) * dpr() - ix * view.s;
+  view.y = (e.clientY - r.top) * dpr() - iy * view.s;
+  draw();
+}, { passive: false });
+addEventListener("keydown", (e) => {
+  const k = e.key.toLowerCase(), m = marks()[who];
+  if (k === "a" || k === "b") { who = k.toUpperCase(); focus(); }
+  else if (k === "h") mark("hidden");
+  else if (k === "backspace" || k === "delete") { delete marks()[who]; save(); draw(); }
+  else if (k === "f") { whole = !whole; focus(); }
+  else if (k === "n") go(i + 1);
+  else if (k === "p") go(i - 1);
+  else if (k.startsWith("arrow") && Array.isArray(m)) {
+    const step = e.shiftKey ? 2 : 0.5;
+    if (k === "arrowleft") m[0] -= step;
+    if (k === "arrowright") m[0] += step;
+    if (k === "arrowup") m[1] -= step;
+    if (k === "arrowdown") m[1] += step;
+    m[0] = +Math.min(M.width, Math.max(0, m[0])).toFixed(2);
+    m[1] = +Math.min(M.height, Math.max(0, m[1])).toFixed(2);
+    save();
+    draw();
+  } else return;
+  e.preventDefault();
+});
+init();
+</script>
+</body>
+</html>
