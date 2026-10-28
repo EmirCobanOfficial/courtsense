@@ -8,6 +8,8 @@ Movement data from a tennis coach's training video, built on Meta **SAM 3.1** an
 
 Demo video (3 min): https://youtu.be/C0gcC3CdusI
 
+Website: https://emircobanofficial.github.io/courtsense-site/
+
 ## Meta AI in CourtSense
 
 | Meta model or package | What it does here |
