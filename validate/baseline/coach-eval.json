@@ -1,0 +1,111 @@
+{
+ "generatedAt": "2026-10-28T21:23:10.487Z",
+ "score": 7,
+ "total": 13,
+ "results": [
+  {
+   "id": "G1",
+   "why": "grounded distance",
+   "expect": "accept",
+   "got": "accept",
+   "ok": true,
+   "refusals": 0
+  },
+  {
+   "id": "G2",
+   "why": "grounded moment and speed",
+   "expect": "accept",
+   "got": "accept",
+   "ok": true,
+   "refusals": 0
+  },
+  {
+   "id": "G3",
+   "why": "rough value marked as rough",
+   "expect": "accept",
+   "got": "accept",
+   "ok": true,
+   "refusals": 0
+  },
+  {
+   "id": "G4",
+   "why": "Turkish answer",
+   "expect": "accept",
+   "got": "accept",
+   "ok": true,
+   "refusals": 0
+  },
+  {
+   "id": "G5",
+   "why": "minute breakdown value",
+   "expect": "accept",
+   "got": "accept",
+   "ok": true,
+   "refusals": 0
+  },
+  {
+   "id": "B1",
+   "why": "A's distance given to B",
+   "expect": "reject",
+   "got": "accept",
+   "ok": false,
+   "refusals": 0
+  },
+  {
+   "id": "B2",
+   "why": "average speed called peak speed",
+   "expect": "reject",
+   "got": "accept",
+   "ok": false,
+   "refusals": 0
+  },
+  {
+   "id": "B3",
+   "why": "wrong unit",
+   "expect": "reject",
+   "got": "accept",
+   "ok": false,
+   "refusals": 0
+  },
+  {
+   "id": "B4",
+   "why": "invented small count (real: 9)",
+   "expect": "reject",
+   "got": "accept",
+   "ok": false,
+   "refusals": 0
+  },
+  {
+   "id": "B5",
+   "why": "rough value given as exact and compared",
+   "expect": "reject",
+   "got": "accept",
+   "ok": false,
+   "refusals": 0
+  },
+  {
+   "id": "B6",
+   "why": "number from the question confirmed as fact",
+   "expect": "reject",
+   "got": "accept",
+   "ok": false,
+   "refusals": 0
+  },
+  {
+   "id": "B7",
+   "why": "invented time (control)",
+   "expect": "reject",
+   "got": "reject",
+   "ok": true,
+   "refusals": 2
+  },
+  {
+   "id": "B8",
+   "why": "invented decimal (control)",
+   "expect": "reject",
+   "got": "reject",
+   "ok": true,
+   "refusals": 2
+  }
+ ]
+}

@@ -1,0 +1,151 @@
+{
+ "generatedAt": "2026-10-28T21:22:14.189Z",
+ "commit": "8825f46",
+ "targets": {
+  "model": {
+   "a": -385.7489226637617,
+   "b": 0.8988562630065073
+  },
+  "depthNoiseM": [
+   0.11,
+   0.41
+  ],
+  "coverage": [
+   0.921,
+   0.993
+  ],
+  "farFixShiftM": -0.5797329337623546
+ },
+ "noise": {
+  "near": {
+   "bottomPx": 2,
+   "xPx": 2,
+   "rho": 0,
+   "occludeP": 0,
+   "occludeMaxPx": 0,
+   "dropP": 0.07899999999999996
+  },
+  "far": {
+   "bottomPx": 2,
+   "xPx": 2,
+   "rho": 0.97,
+   "occludeP": 0,
+   "occludeMaxPx": 0,
+   "dropP": 0.007000000000000006
+  },
+  "farMatch": {
+   "depthNoiseM": 0.19,
+   "farFixShiftM": -0.57
+  }
+ },
+ "results": {
+  "A": {
+   "distancePct": {
+    "mean": -1.139,
+    "sd": 0.087
+   },
+   "avgSpeedMs": {
+    "mean": 0.112,
+    "sd": 0.006
+   },
+   "peakSpeedMs": {
+    "mean": -0.397,
+    "sd": 0.02
+   },
+   "rmseXM": {
+    "mean": 0.125,
+    "sd": 0.001
+   },
+   "rmseYM": {
+    "mean": 0.101,
+    "sd": 0.001
+   },
+   "depthNoiseM": {
+    "mean": 0.11,
+    "sd": 0
+   },
+   "zone.behindBaselinePp": {
+    "mean": -0.602,
+    "sd": 0.214
+   },
+   "zone.baselinePp": {
+    "mean": 0.471,
+    "sd": 0.224
+   },
+   "zone.midCourtPp": {
+    "mean": 0.131,
+    "sd": 0.172
+   },
+   "zone.netPp": {
+    "mean": 0,
+    "sd": 0
+   },
+   "lateral.leftPp": {
+    "mean": 0.36,
+    "sd": 0.136
+   },
+   "lateral.centerPp": {
+    "mean": 0.053,
+    "sd": 0.286
+   },
+   "lateral.rightPp": {
+    "mean": -0.393,
+    "sd": 0.174
+   }
+  },
+  "B": {
+   "distancePct": {
+    "mean": 5.002,
+    "sd": 0.916
+   },
+   "avgSpeedMs": {
+    "mean": 0.09,
+    "sd": 0.017
+   },
+   "peakSpeedMs": {
+    "mean": -0.365,
+    "sd": 0.04
+   },
+   "rmseXM": {
+    "mean": 0.16,
+    "sd": 0.007
+   },
+   "rmseYM": {
+    "mean": 1.187,
+    "sd": 0.067
+   },
+   "depthNoiseM": {
+    "mean": 0.192,
+    "sd": 0.007
+   },
+   "zone.behindBaselinePp": {
+    "mean": -27.162,
+    "sd": 4.01
+   },
+   "zone.baselinePp": {
+    "mean": 16.631,
+    "sd": 3.808
+   },
+   "zone.midCourtPp": {
+    "mean": 6.711,
+    "sd": 1.732
+   },
+   "zone.netPp": {
+    "mean": 3.8,
+    "sd": 0.473
+   },
+   "lateral.leftPp": {
+    "mean": -0.1,
+    "sd": 0.155
+   },
+   "lateral.centerPp": {
+    "mean": 0.933,
+    "sd": 0.329
+   },
+   "lateral.rightPp": {
+    "mean": -0.833,
+    "sd": 0.219
+   }
+  }
+ }
+}
