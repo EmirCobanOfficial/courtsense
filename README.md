@@ -2,9 +2,20 @@
 
 Movement data from a tennis coach's training video, built on Meta **SAM 3.1** and **Muse Spark 1.3**.
 
-> Built during the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026). Nothing in this repository existed before the hackathon; the commit history shows the build.
+> Built during the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026) for the problem statement **Build for Your World**. Nothing in this repository existed before the hackathon; the commit history shows the build. Pre-existing: our coach's training video, Meta's models and packages, and open-source libraries.
+
+[![CourtSense demo video (3 min)](https://img.youtube.com/vi/fbqArD7z1YA/hqdefault.jpg)](https://youtu.be/fbqArD7z1YA)
 
 Demo video (3 min): https://youtu.be/fbqArD7z1YA
+
+## Meta AI in CourtSense
+
+| Meta model or package | What it does here |
+|---|---|
+| **SAM 3.1** (Meta Model API) | finds and tracks both players in every frame of a session, in one streamed video request |
+| **Muse Spark 1.3** (Meta Model API) | the coach assistant: picks its own tools, watches short clips of the session (video understanding), answers in English or Turkish; also writes the coach report |
+| `@meta-sam/parser` | reads SAM 3.1's streamed output (boxes and masks per frame) |
+| `@meta-sam/react`, `@meta-sam/graphics` | play the session in the browser with the SAM masks drawn on it |
 
 ## What it does
 
