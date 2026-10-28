@@ -2,9 +2,9 @@
 
 Movement data from a tennis coach's training video, built on Meta **SAM 3.1** and **Muse Spark 1.3**.
 
-> Built during the **Meta Global AI Developer Hackathon** (Oct 27 – Nov 4, 2026). Nothing in this repository existed before the hackathon; the commit history shows the build.
+> Built during the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026). Nothing in this repository existed before the hackathon; the commit history shows the build.
 
-Demo video: _link added at submission_
+Demo video (3 min): https://youtu.be/fbqArD7z1YA
 
 ## What it does
 
