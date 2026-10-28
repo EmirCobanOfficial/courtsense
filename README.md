@@ -4,9 +4,9 @@ Movement data from a tennis coach's training video, built on Meta **SAM 3.1** an
 
 > Built during the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026) for the problem statement **Build for Your World**. Nothing in this repository existed before the hackathon; the commit history shows the build. Pre-existing: our coach's training video, Meta's models and packages, and open-source libraries.
 
-[![CourtSense demo video (3 min)](https://img.youtube.com/vi/fbqArD7z1YA/hqdefault.jpg)](https://youtu.be/fbqArD7z1YA)
+[![CourtSense demo video (3 min)](https://img.youtube.com/vi/C0gcC3CdusI/hqdefault.jpg)](https://youtu.be/C0gcC3CdusI)
 
-Demo video (3 min): https://youtu.be/fbqArD7z1YA
+Demo video (3 min): https://youtu.be/C0gcC3CdusI
 
 ## Meta AI in CourtSense
 
