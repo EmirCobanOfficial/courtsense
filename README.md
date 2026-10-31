@@ -1,5 +1,7 @@
 # CourtSense
 
+[![CI](https://github.com/EmirCobanOfficial/courtsense/actions/workflows/ci.yml/badge.svg)](https://github.com/EmirCobanOfficial/courtsense/actions/workflows/ci.yml)
+
 Movement data from a tennis coach's training video, built on Meta **SAM 3.1** and **Muse Spark 1.3**.
 
 > Built during the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026) for the problem statement **Build for Your World**. Nothing in this repository existed before the hackathon; the commit history shows the build. Pre-existing: our coach's training video, Meta's models and packages, and open-source libraries.
@@ -133,8 +135,10 @@ Requirements: Node 22.18+ (the tests run TypeScript directly), `ffmpeg` and `ffp
 npm install
 echo "MODEL_API_KEY=your-key" > .env.local
 npm run dev            # http://localhost:3000
-node --test lib/*.test.ts
+node --test lib/*.test.ts validate/*.test.ts
 ```
+
+The same checks (types, lint, tests, production build) run on GitHub for every push.
 
 Upload a video, set the analysis start and end, wait for SAM 3.1, click the four court points, and save.
 

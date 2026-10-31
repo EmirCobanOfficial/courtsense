@@ -1,0 +1,23 @@
+# Every push and pull request: install, type-check, lint, unit tests, production build.
+# The tests need no API key and no video: they run on synthetic sessions and a scripted model.
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24] # README: Node 22.18+ (runs the TypeScript tests directly)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx eslint lib app validate
+      - run: node --test lib/*.test.ts validate/*.test.ts
+      - run: npx next build
