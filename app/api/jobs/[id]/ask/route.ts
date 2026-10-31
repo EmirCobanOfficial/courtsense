@@ -1,6 +1,6 @@
-import OpenAI from "openai";
 import { isJobId, jobFile, readJob, readTracks } from "@/lib/jobs.ts";
 import { ask, loadSession, type CoachEvent } from "@/lib/coach.ts";
+import { modelClient, type ModelClient } from "@/lib/model.ts";
 
 // Body: { question, history?: [{ question, answer }] (max 3), lang?: "en" | "tr" }. Streams one CoachEvent JSON per line.
 export async function POST(req: Request, ctx: RouteContext<"/api/jobs/[id]/ask">) {
@@ -9,7 +9,12 @@ export async function POST(req: Request, ctx: RouteContext<"/api/jobs/[id]/ask">
   if (!job) return Response.json({ error: "not found" }, { status: 404 });
   const tracks = job.status === "ready" && job.calibration ? readTracks(job) : null;
   if (!tracks) return Response.json({ error: "Process and calibrate the video first." }, { status: 409 });
-  if (!process.env.MODEL_API_KEY) return Response.json({ error: "MODEL_API_KEY is not set in .env.local" }, { status: 500 });
+  let client: ModelClient;
+  try {
+    client = modelClient();
+  } catch (e) {
+    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+  }
   const { question, history = [], lang } = await req.json().catch(() => ({}));
   const validHistory =
     Array.isArray(history) &&
@@ -20,7 +25,6 @@ export async function POST(req: Request, ctx: RouteContext<"/api/jobs/[id]/ask">
   }
 
   const session = loadSession(job, tracks, jobFile(id, "clip.mp4"));
-  const client = new OpenAI({ baseURL: "https://api.meta.ai/v1", apiKey: process.env.MODEL_API_KEY });
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {

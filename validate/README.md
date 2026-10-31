@@ -9,7 +9,7 @@ Measure CourtSense against something fixed before changing how it works. None of
 | `node validate/coach-eval.ts` | AI Coach test set with a scripted fake model: should a given answer reach the coach? The 13 Phase 0 cases, plus extra cases that try to game the check. `--save` refreezes. | $0 |
 | `node validate/coach-live.ts [--cap 0.15] [--report]` | Real Muse Spark answers on the real session (and with `--report` the English report), checked by the app and audited offline. $0.50 is the total for all live runs: what earlier runs spent is subtracted first. | ≤ cap |
 | `node validate/annotate/pick.ts`, then `node validate/annotate/server.ts` | Hand-marking page at http://127.0.0.1:3461: mark both players' feet in 40 frames (plus 5 shown again). Frames and marks stay in `data/` on this machine. | $0 |
-| `node validate/annotate/compare.ts` | Hand marks vs. what the app computed, per side, in meters and pixels; how repeatable the marks are. Gives no numbers until at least 10 positions are marked. `--self-check` tests the math. | $0 |
+| `node validate/annotate/compare.ts [--save]` | Hand marks vs. what the app computed, per side, in meters (with 95% intervals) and pixels; how repeatable the marks are; what the numbers do not show. Gives no numbers until at least 10 positions are marked. `--save` freezes the result as the before/after baseline. `--self-check` tests the math. | $0 |
 | `node --test lib/*.test.ts validate/*.test.ts` | Unit tests: the claim check, the agent loop, the report rewrite, the budget guard. | $0 |
 
 `snapshot.ts`, `coach-eval.ts` and `coach-live.ts` need the session data in `data/d8650763e4d0` (git-ignored). `synthetic.ts` falls back to the noise model saved in `baseline/synthetic.json` when the data is not there.
@@ -57,3 +57,16 @@ A refused answer goes back to the model with the reasons. After three refusals t
 - Derived numbers are refused even when the arithmetic is right: differences, sums, ratios, per-minute averages. The model has to give the underlying values instead.
 - Whole numbers are not rounded: 570 for 567 is refused.
 - A time the assistant showed or watched (`shown_time`) is accepted as a reference. What the vision model says it saw there is not checked.
+
+## Checking the coach and report in the browser without API calls
+
+`COURTSENSE_FAKE_MODEL=good` (or `=bad`) swaps Muse Spark for a scripted local model (`lib/fake-model.ts`) and disables SAM. With `MODEL_API_KEY=` left empty as well, Next does not load the key from `.env.local`, so no paid call can be made:
+
+```
+COURTSENSE_FAKE_MODEL=good MODEL_API_KEY= npm run dev -- --port 3457
+```
+
+- `good`: the coach answer and the report pass the claim check (verified badge).
+- `bad`: one number is wrong every time. The answer is refused twice, then shown as not verified, and the report stays not verified after its rewrite.
+
+Every fake answer starts with "(Fake model, no API call.)". Use a separate job folder for the check, because generating a report overwrites that job's `report.<lang>.md`.

@@ -1,5 +1,6 @@
 // Step 3: the local page for hand-marking the players' feet. Listens on 127.0.0.1 only and answers only requests
-// addressed to it, so the frames and marks never leave this machine. Marks are saved on every change.
+// addressed to it, so the frames and marks never leave this machine. Marks are saved on every change; a copy is kept
+// at every start and before any save that has fewer marks, and a page opened before the last save cannot overwrite it.
 // usage (from the repo root): node validate/annotate/pick.ts, then node validate/annotate/server.ts [--port 3461]
 import fs from "node:fs";
 import http from "node:http";
@@ -13,6 +14,17 @@ if (!fs.existsSync(`${DIR}/frames.json`)) throw new Error("no frames yet: run no
 const manifest = JSON.parse(fs.readFileSync(`${DIR}/frames.json`, "utf8")) as Manifest;
 const ids = new Set(manifest.frames.map((x) => x.id));
 const files = new Set(manifest.frames.map((x) => x.file));
+
+const BACKUPS = "data/validation/annotate/backups";
+type Saved = { updatedAt?: string; labels: Labels };
+const read = (): Saved | null => (fs.existsSync(LABELS) ? JSON.parse(fs.readFileSync(LABELS, "utf8")) : null);
+const count = (l: Labels) => Object.values(l).reduce((n, m) => n + Object.keys(m).length, 0);
+function backup(why: string) {
+  fs.mkdirSync(BACKUPS, { recursive: true });
+  fs.copyFileSync(LABELS, `${BACKUPS}/annotations-${new Date().toISOString().replace(/[:.]/g, "-")}-${why}.json`);
+}
+const atStart = read();
+if (atStart && count(atStart.labels)) backup("start");
 
 const okMark = (v: unknown) => v === "hidden" || (Array.isArray(v) && v.length === 2 && v.every((n) => Number.isFinite(n)) && v[0] >= 0 && v[0] <= manifest.width && v[1] >= 0 && v[1] <= manifest.height);
 const okLabels = (l: unknown): l is Labels => !!l && typeof l === "object" && Object.entries(l).every(([id, m]) =>
@@ -39,16 +51,22 @@ http.createServer((req, res) => {
       if (body.length > 1e6) req.destroy();
     });
     req.on("end", () => {
-      let labels: unknown;
+      let d: { labels?: unknown; base?: string | null };
       try {
-        labels = JSON.parse(body).labels;
+        d = JSON.parse(body);
       } catch {
         return send(400, '{"error":"bad JSON"}');
       }
+      const labels = d.labels;
       if (!okLabels(labels)) return send(400, '{"error":"bad marks"}');
-      fs.writeFileSync(`${LABELS}.tmp`, JSON.stringify({ job: JOB, updatedAt: new Date().toISOString(), labels }, null, 1) + "\n");
+      const current = read();
+      // base: the version the page last loaded or saved; another tab may have saved newer marks since
+      if (d.base !== undefined && (current?.updatedAt ?? null) !== d.base) return send(409, '{"error":"newer marks were saved from another tab: reload this page"}');
+      if (current && count(labels) < count(current.labels)) backup("before-removal");
+      const updatedAt = new Date().toISOString();
+      fs.writeFileSync(`${LABELS}.tmp`, JSON.stringify({ job: JOB, updatedAt, labels }, null, 1) + "\n");
       fs.renameSync(`${LABELS}.tmp`, LABELS); // a crash mid-write cannot leave half a file
-      send(200, JSON.stringify({ saved: Object.keys(labels).length }));
+      send(200, JSON.stringify({ saved: count(labels), version: updatedAt }));
     });
     return;
   }

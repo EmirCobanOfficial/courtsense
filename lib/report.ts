@@ -2,13 +2,13 @@
 // It is written from the same views the assistant's tools return and lists every number as a claim, checked like the
 // assistant's answers (claims.ts). One rewrite with the problems found; after that, or if the rewrite call fails, the
 // report is kept but marked unverified.
-import OpenAI from "openai";
+import type OpenAI from "openai";
 import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { verify, type Player, type Problem } from "./claims.ts";
 import { CLAIM_RULES, CLAIMS, reportData, type Session } from "./coach.ts";
 import type { Lang } from "./i18n.ts";
+import { modelClient, type ModelClient } from "./model.ts";
 
-type Client = Pick<OpenAI, "responses">;
 const ATTEMPTS = 2;
 
 const instructions = (lang: Lang) => `You assist a tennis coach. You receive movement data computed from a training video:
@@ -38,12 +38,7 @@ const TOOL = {
   parameters: { type: "object", properties: { markdown: { type: "string" }, claims: CLAIMS }, required: ["markdown", "claims"], additionalProperties: false },
 };
 
-function metaClient(): Client {
-  if (!process.env.MODEL_API_KEY) throw new Error("MODEL_API_KEY is not set in .env.local");
-  return new OpenAI({ baseURL: "https://api.meta.ai/v1", apiKey: process.env.MODEL_API_KEY });
-}
-
-export async function writeReport(s: Session, lang: Lang = "en", client: Client = metaClient()): Promise<{ text: string; verified: boolean; problems: Problem[] }> {
+export async function writeReport(s: Session, lang: Lang = "en", client: ModelClient = modelClient()): Promise<{ text: string; verified: boolean; problems: Problem[] }> {
   const data = JSON.stringify(reportData(s));
   const rough = Object.fromEntries(s.metrics.map((m) => [m.player, !m.reliable])) as Record<Player, boolean>;
   let last: { text: string; problems: Problem[]; submitted: unknown } | null = null;

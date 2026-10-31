@@ -7,6 +7,7 @@ import type { Box, Tracks } from "./metrics.ts";
 import type { Job } from "./jobs.ts";
 import { ask, findMoments, loadSession, type CoachEvent } from "./coach.ts";
 import { writeReport } from "./report.ts";
+import { fakeModel } from "./fake-model.ts";
 
 const imagePts: Pt[] = [[400, 900], [1500, 900], [1250, 600], [650, 600]];
 const toImage = solveHomography(CALIBRATION_POINTS.map((p) => p.world), imagePts);
@@ -113,4 +114,16 @@ test("writeReport: a refused report is rewritten once with the problems, then ma
   // a failed rewrite call keeps the first report, unverified
   const failed = await writeReport(session, "en", fake([bad, new Error("budget")]).client);
   assert.deepEqual([failed.text, failed.verified], ["## Player A\n- Ran 999 m.", false]);
+});
+
+test("fake model (browser check without API calls): good passes the claim check, bad ends unverified", async () => {
+  for (const bad of [false, true]) {
+    const events: CoachEvent[] = [];
+    await ask(session, "Where did Player A run fastest?", [], (e) => events.push(e), fakeModel(bad));
+    const answer = events.find((e) => e.type === "answer");
+    assert.ok(answer?.type === "answer" && answer.verified === !bad && answer.text.startsWith("(Fake model"), JSON.stringify(events));
+    assert.equal(events.filter((e) => e.type === "refused").length, bad ? 2 : 0);
+    assert.ok(events.some((e) => e.type === "seek"));
+    assert.equal((await writeReport(session, "en", fakeModel(bad))).verified, !bad);
+  }
 });

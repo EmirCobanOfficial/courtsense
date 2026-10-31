@@ -32,6 +32,7 @@ const $ = (id) => document.getElementById(id);
 const cv = $("c"), ctx = cv.getContext("2d");
 const COLOR = { A: "#4fc3f7", B: "#ffb74d" };
 let M, labels = {}, i = 0, who = "A", whole = false, view = { s: 1, x: 0, y: 0 }, drag = null, timer, img = new Image();
+let version = null, saving = Promise.resolve(); // version: the save this page builds on; saves go one at a time
 const fr = () => M.frames[i];
 const marks = () => (labels[fr().id] ??= {});
 const done = (f) => labels[f.id]?.A !== undefined && labels[f.id]?.B !== undefined;
@@ -39,7 +40,9 @@ const dpr = () => window.devicePixelRatio || 1;
 
 async function init() {
   M = await (await fetch("/api/frames")).json();
-  labels = (await (await fetch("/api/labels")).json()).labels || {};
+  const saved = await (await fetch("/api/labels")).json();
+  labels = saved.labels || {};
+  version = saved.updatedAt ?? null;
   i = Math.max(0, M.frames.findIndex((f) => !done(f)));
   addEventListener("resize", () => { fit(); focus(); });
   fit();
@@ -129,14 +132,16 @@ function go(j) {
 function save() {
   clearTimeout(timer);
   $("status").textContent = "saving…";
-  timer = setTimeout(async () => {
+  timer = setTimeout(() => (saving = saving.then(async () => {
     try {
-      const r = await fetch("/api/labels", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ labels }) });
-      $("status").textContent = r.ok ? "saved" : "save failed: " + (await r.text());
+      const r = await fetch("/api/labels", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ labels, base: version }) });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) version = d.version;
+      $("status").textContent = r.ok ? `saved (${d.saved} marks)` : `NOT saved: ${d.error || r.status}`;
     } catch (e) {
-      $("status").textContent = "save failed: " + e.message;
+      $("status").textContent = "NOT saved: " + e.message;
     }
-  }, 250);
+  })), 250);
 }
 
 cv.addEventListener("pointerdown", (e) => {

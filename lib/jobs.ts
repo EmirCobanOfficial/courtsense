@@ -7,6 +7,7 @@ import OpenAI from "openai";
 import { frameIndexOf, parseVideoStream, recordsOfKind } from "@meta-sam/parser";
 import type { Box, Tracks } from "./metrics.ts";
 import type { Pt } from "./court.ts";
+import { fakeMode } from "./model.ts";
 
 export const DATA = path.join(process.cwd(), "data");
 const FPS = 15; // enough for footwork; also keeps the per-frame SAM bill low
@@ -134,6 +135,7 @@ async function preprocess(src: string, out: string, startSec: number, endSec: nu
 }
 
 async function segment(id: string, clip: string, info: { frames: number; width: number; height: number }, onProgress: (p: number) => void) {
+  if (fakeMode()) throw new Error("COURTSENSE_FAKE_MODEL is set: SAM calls are disabled");
   if (!process.env.MODEL_API_KEY) throw new Error("MODEL_API_KEY is not set in .env.local");
   const client = new OpenAI({ baseURL: "https://api.meta.ai/v1", apiKey: process.env.MODEL_API_KEY });
   const file = await client.files.create({ file: fs.createReadStream(clip), purpose: "user_data" });
