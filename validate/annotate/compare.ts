@@ -34,7 +34,7 @@ const sideOf = (court: Pt) => (court[1] < COURT.net ? "near" : "far");
 const git = (...args: string[]) => execFileSync("git", args, { encoding: "utf8" }).trim();
 const version = { commit: git("rev-parse", "--short", "HEAD"), uncommittedChanges: git("status", "--porcelain", "--", "lib").length > 0 };
 
-type Row = { player: "A" | "B"; side: string; mark: Pt; markCourt: Pt; s: NonNullable<ReturnType<typeof systemAt>> };
+type Row = { key: string; player: "A" | "B"; side: string; mark: Pt; markCourt: Pt; s: NonNullable<ReturnType<typeof systemAt>> };
 const hidden = { A: 0, B: 0 };
 const originals = M.frames.filter((x) => !x.repeatOf);
 function rowsOf(system: System): Row[] {
@@ -45,7 +45,7 @@ function rowsOf(system: System): Row[] {
       const s = Array.isArray(m) ? systemAt(system, i as 0 | 1, fr.f) : null;
       if (!s || !Array.isArray(m)) return;
       const markCourt = applyHomography(system.toCourt, m);
-      out.push({ player: p, side: sideOf(markCourt), mark: m, markCourt, s });
+      out.push({ key: `${fr.id} ${p}`, player: p, side: sideOf(markCourt), mark: m, markCourt, s });
     });
   }
   return out;
@@ -148,9 +148,18 @@ const before = Object.fromEntries(["near", "far"].map((side) => {
   const rs = rowsV1.filter((r) => r.side === side);
   return [side, { metricsInput: meters(rs, (r) => r.s.fixed), smoothed: meters(rs, (r) => r.s.smoothed) }];
 }));
+// V1 minus V2 RMSE on the very same marks, resampled together: the interval of the change itself
+function paired(side: string, pick: (r: Row) => Pt | null) {
+  const v1 = new Map(rowsV1.filter((r) => r.side === side).map((r) => [r.key, r]));
+  const pairs = rows.filter((r) => r.side === side && v1.has(r.key)).flatMap((r) => {
+    const a = pick(v1.get(r.key)!), b = pick(r);
+    return a && b ? [[Math.hypot(a[0] - r.markCourt[0], a[1] - r.markCourt[1]), Math.hypot(b[0] - r.markCourt[0], b[1] - r.markCourt[1])]] : [];
+  });
+  return pairs.length ? stat(pairs, (v) => rms(v.map((x) => x[0])) - rms(v.map((x) => x[1]))) : null;
+}
 const beforeAfter = Object.fromEntries(Object.entries(sides).flatMap(([side, v]) => (["metricsInput", "smoothed"] as const).map((k) => {
-  const b = before[side]?.[k], n = v.meters[k];
-  return [`${side} ${k}`, { "RMSE V1": b && show(b.rmse), "RMSE V2": n && show(n.rmse), "depth bias V1": b && show(b.biasDepth), "depth bias V2": n && show(n.biasDepth) }];
+  const b = before[side]?.[k], n = v.meters[k], d = paired(side, k === "smoothed" ? (r) => r.s.smoothed : (r) => r.s.fixed);
+  return [`${side} ${k}`, { "RMSE V1": b && show(b.rmse), "RMSE V2": n && show(n.rmse), "V1 minus V2": d && show(d), "depth bias V1": b && show(b.biasDepth), "depth bias V2": n && show(n.biasDepth) }];
 })));
 console.log("\nV1 (hackathon) vs V2 (Step 2) on the same marks, meters; value [95% interval]:");
 console.table(beforeAfter);
@@ -175,7 +184,7 @@ What these numbers do not show:
 - The hand mark (midway between the feet) and the app's point (bottom-center of the SAM box) are defined differently;
   part of a constant offset can be that definition rather than a tracking error.`);
 
-const result = { job: JOB, set: SET || "design", version, marked: rows.length, hidden, sides, before, repeat };
+const result = { job: JOB, set: SET || "design", version, marked: rows.length, hidden, sides, before, beforeAfter, repeat };
 const out = process.argv.includes("--save") ? OUT : `data/validation/annotation-compare-${JOB}${SET ? `-${SET}` : ""}.json`;
 fs.writeFileSync(out, JSON.stringify(result, null, 1) + "\n");
 console.log(`\nsaved ${out}${out === OUT ? "" : " (git-ignored)"}`);

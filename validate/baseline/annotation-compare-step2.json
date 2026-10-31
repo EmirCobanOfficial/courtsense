@@ -1,0 +1,485 @@
+{
+ "job": "d8650763e4d0",
+ "set": "design",
+ "version": {
+  "commit": "26dddc5",
+  "uncommittedChanges": false
+ },
+ "marked": 80,
+ "hidden": {
+  "A": 0,
+  "B": 0
+ },
+ "sides": {
+  "near": {
+   "meters": {
+    "boxBottom": {
+     "n": 40,
+     "biasLateral": {
+      "v": -0.04,
+      "ci": [
+       -0.1,
+       0.02
+      ]
+     },
+     "biasDepth": {
+      "v": -0.29,
+      "ci": [
+       -0.35,
+       -0.24
+      ]
+     },
+     "rmseLateral": {
+      "v": 0.2,
+      "ci": [
+       0.16,
+       0.24
+      ]
+     },
+     "rmseDepth": {
+      "v": 0.34,
+      "ci": [
+       0.28,
+       0.4
+      ]
+     },
+     "rmse": {
+      "v": 0.39,
+      "ci": [
+       0.33,
+       0.45
+      ]
+     }
+    },
+    "metricsInput": {
+     "n": 40,
+     "biasLateral": {
+      "v": -0.04,
+      "ci": [
+       -0.1,
+       0.02
+      ]
+     },
+     "biasDepth": {
+      "v": -0.29,
+      "ci": [
+       -0.35,
+       -0.24
+      ]
+     },
+     "rmseLateral": {
+      "v": 0.2,
+      "ci": [
+       0.16,
+       0.24
+      ]
+     },
+     "rmseDepth": {
+      "v": 0.34,
+      "ci": [
+       0.28,
+       0.4
+      ]
+     },
+     "rmse": {
+      "v": 0.39,
+      "ci": [
+       0.33,
+       0.45
+      ]
+     }
+    },
+    "smoothed": {
+     "n": 40,
+     "biasLateral": {
+      "v": -0.04,
+      "ci": [
+       -0.1,
+       0.03
+      ]
+     },
+     "biasDepth": {
+      "v": -0.29,
+      "ci": [
+       -0.35,
+       -0.23
+      ]
+     },
+     "rmseLateral": {
+      "v": 0.21,
+      "ci": [
+       0.17,
+       0.26
+      ]
+     },
+     "rmseDepth": {
+      "v": 0.34,
+      "ci": [
+       0.28,
+       0.4
+      ]
+     },
+     "rmse": {
+      "v": 0.41,
+      "ci": [
+       0.35,
+       0.47
+      ]
+     }
+    }
+   },
+   "pixels": {
+    "n": 40,
+    "biasX": -9.96,
+    "sdX": 33.38,
+    "biasBottom": 19.63,
+    "sdBottom": 11.2,
+    "bottomOver5pxAbove": 0
+   },
+   "players": {
+    "A": 40,
+    "B": 0
+   },
+   "withoutMarkNoise": {
+    "metricsInput": 0.33,
+    "smoothed": 0.36
+   }
+  },
+  "far": {
+   "meters": {
+    "boxBottom": {
+     "n": 40,
+     "biasLateral": {
+      "v": -0.02,
+      "ci": [
+       -0.09,
+       0.05
+      ]
+     },
+     "biasDepth": {
+      "v": 1.22,
+      "ci": [
+       0.74,
+       1.76
+      ]
+     },
+     "rmseLateral": {
+      "v": 0.21,
+      "ci": [
+       0.14,
+       0.26
+      ]
+     },
+     "rmseDepth": {
+      "v": 2.06,
+      "ci": [
+       1.51,
+       2.65
+      ]
+     },
+     "rmse": {
+      "v": 2.07,
+      "ci": [
+       1.52,
+       2.66
+      ]
+     }
+    },
+    "metricsInput": {
+     "n": 40,
+     "biasLateral": {
+      "v": -0.05,
+      "ci": [
+       -0.1,
+       0.01
+      ]
+     },
+     "biasDepth": {
+      "v": 0.05,
+      "ci": [
+       -0.29,
+       0.41
+      ]
+     },
+     "rmseLateral": {
+      "v": 0.18,
+      "ci": [
+       0.14,
+       0.21
+      ]
+     },
+     "rmseDepth": {
+      "v": 1.15,
+      "ci": [
+       0.95,
+       1.33
+      ]
+     },
+     "rmse": {
+      "v": 1.16,
+      "ci": [
+       0.97,
+       1.34
+      ]
+     }
+    },
+    "smoothed": {
+     "n": 40,
+     "biasLateral": {
+      "v": -0.04,
+      "ci": [
+       -0.1,
+       0.03
+      ]
+     },
+     "biasDepth": {
+      "v": 0.14,
+      "ci": [
+       -0.18,
+       0.45
+      ]
+     },
+     "rmseLateral": {
+      "v": 0.2,
+      "ci": [
+       0.16,
+       0.23
+      ]
+     },
+     "rmseDepth": {
+      "v": 1.04,
+      "ci": [
+       0.9,
+       1.18
+      ]
+     },
+     "rmse": {
+      "v": 1.06,
+      "ci": [
+       0.92,
+       1.19
+      ]
+     }
+    }
+   },
+   "pixels": {
+    "n": 40,
+    "biasX": -1.26,
+    "sdX": 5.62,
+    "biasBottom": -2.03,
+    "sdBottom": 3.16,
+    "bottomOver5pxAbove": 7
+   },
+   "players": {
+    "A": 0,
+    "B": 40
+   },
+   "withoutMarkNoise": {
+    "metricsInput": 1.05,
+    "smoothed": 0.93
+   }
+  }
+ },
+ "before": {
+  "near": {
+   "metricsInput": {
+    "n": 40,
+    "biasLateral": {
+     "v": -0.04,
+     "ci": [
+      -0.1,
+      0.02
+     ]
+    },
+    "biasDepth": {
+     "v": -0.29,
+     "ci": [
+      -0.35,
+      -0.24
+     ]
+    },
+    "rmseLateral": {
+     "v": 0.2,
+     "ci": [
+      0.16,
+      0.24
+     ]
+    },
+    "rmseDepth": {
+     "v": 0.34,
+     "ci": [
+      0.28,
+      0.4
+     ]
+    },
+    "rmse": {
+     "v": 0.39,
+     "ci": [
+      0.33,
+      0.45
+     ]
+    }
+   },
+   "smoothed": {
+    "n": 40,
+    "biasLateral": {
+     "v": -0.04,
+     "ci": [
+      -0.1,
+      0.03
+     ]
+    },
+    "biasDepth": {
+     "v": -0.29,
+     "ci": [
+      -0.35,
+      -0.23
+     ]
+    },
+    "rmseLateral": {
+     "v": 0.21,
+     "ci": [
+      0.17,
+      0.26
+     ]
+    },
+    "rmseDepth": {
+     "v": 0.34,
+     "ci": [
+      0.28,
+      0.4
+     ]
+    },
+    "rmse": {
+     "v": 0.41,
+     "ci": [
+      0.35,
+      0.47
+     ]
+    }
+   }
+  },
+  "far": {
+   "metricsInput": {
+    "n": 40,
+    "biasLateral": {
+     "v": -0.05,
+     "ci": [
+      -0.11,
+      0
+     ]
+    },
+    "biasDepth": {
+     "v": -0.26,
+     "ci": [
+      -0.64,
+      0.1
+     ]
+    },
+    "rmseLateral": {
+     "v": 0.18,
+     "ci": [
+      0.14,
+      0.21
+     ]
+    },
+    "rmseDepth": {
+     "v": 1.25,
+     "ci": [
+      1.03,
+      1.47
+     ]
+    },
+    "rmse": {
+     "v": 1.26,
+     "ci": [
+      1.04,
+      1.48
+     ]
+    }
+   },
+   "smoothed": {
+    "n": 40,
+    "biasLateral": {
+     "v": -0.04,
+     "ci": [
+      -0.1,
+      0.02
+     ]
+    },
+    "biasDepth": {
+     "v": -0.24,
+     "ci": [
+      -0.59,
+      0.11
+     ]
+    },
+    "rmseLateral": {
+     "v": 0.2,
+     "ci": [
+      0.16,
+      0.23
+     ]
+    },
+    "rmseDepth": {
+     "v": 1.15,
+     "ci": [
+      0.94,
+      1.36
+     ]
+    },
+    "rmse": {
+     "v": 1.17,
+     "ci": [
+      0.96,
+      1.37
+     ]
+    }
+   }
+  }
+ },
+ "beforeAfter": {
+  "near metricsInput": {
+   "RMSE V1": "0.39 [0.33, 0.45]",
+   "RMSE V2": "0.39 [0.33, 0.45]",
+   "V1 minus V2": "0 [0, 0]",
+   "depth bias V1": "-0.29 [-0.35, -0.24]",
+   "depth bias V2": "-0.29 [-0.35, -0.24]"
+  },
+  "near smoothed": {
+   "RMSE V1": "0.41 [0.35, 0.47]",
+   "RMSE V2": "0.41 [0.35, 0.47]",
+   "V1 minus V2": "0 [0, 0]",
+   "depth bias V1": "-0.29 [-0.35, -0.23]",
+   "depth bias V2": "-0.29 [-0.35, -0.23]"
+  },
+  "far metricsInput": {
+   "RMSE V1": "1.26 [1.04, 1.48]",
+   "RMSE V2": "1.16 [0.97, 1.34]",
+   "V1 minus V2": "0.1 [-0.08, 0.3]",
+   "depth bias V1": "-0.26 [-0.64, 0.1]",
+   "depth bias V2": "0.05 [-0.29, 0.41]"
+  },
+  "far smoothed": {
+   "RMSE V1": "1.17 [0.96, 1.37]",
+   "RMSE V2": "1.06 [0.92, 1.19]",
+   "V1 minus V2": "0.11 [-0.04, 0.26]",
+   "depth bias V1": "-0.24 [-0.59, 0.11]",
+   "depth bias V2": "0.14 [-0.18, 0.45]"
+  }
+ },
+ "repeat": {
+  "near": {
+   "n": 4,
+   "rmsPx": 33.75,
+   "rmsM": 0.28,
+   "markNoiseM": 0.2
+  },
+  "far": {
+   "n": 5,
+   "rmsPx": 13.44,
+   "rmsM": 0.71,
+   "markNoiseM": 0.5
+  }
+ }
+}
