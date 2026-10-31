@@ -3,7 +3,7 @@
 // only lower this run's share. Every request is priced at its worst case before it is sent (see budget.ts) and the run
 // stops before the cap could be passed. look_at_clip is refused in this mode: video input cannot be priced in advance.
 // No SAM calls. Answers are checked by the app (claims.ts) and audited again offline with simple independent rules.
-// usage (from the repo root): node validate/coach-live.ts [--cap 0.15] [--report]   (--report: also write and check the English report)
+// usage (from the repo root): node validate/coach-live.ts [--cap 0.15] [--report | --only-report]   (also / only the English report)
 import fs from "node:fs";
 import OpenAI from "openai";
 import { jobFile, readJob, readTracks } from "../lib/jobs.ts";
@@ -105,7 +105,8 @@ process.on("exit", () => {
   console.log(`\n${JSON.stringify(summary)}\nsaved ${file} (git-ignored)`);
 });
 
-for (const q of QUESTIONS) {
+const ONLY_REPORT = process.argv.includes("--only-report");
+for (const q of ONLY_REPORT ? [] : QUESTIONS) {
   if (stopped) break;
   const before = { usd: ledger.spentUsd, calls: ledger.calls };
   const events: CoachEvent[] = [];
@@ -133,7 +134,7 @@ for (const q of QUESTIONS) {
 }
 
 // last: questions first keeps the comparison with Phase 0 when the cap runs out
-if (process.argv.includes("--report") && !stopped) {
+if ((process.argv.includes("--report") || ONLY_REPORT) && !stopped) {
   const before = { usd: ledger.spentUsd, calls: ledger.calls };
   try {
     const r = await writeReport(s, "en", client);
