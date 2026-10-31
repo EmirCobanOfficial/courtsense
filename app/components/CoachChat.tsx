@@ -14,6 +14,44 @@ export function CoachChat({ job, onSeek }: { job: Job; onSeek: (sourceSec: numbe
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const abort = useRef<AbortController | null>(null);
+  // a spoken question: recorded here, turned into text by Muse Voice Transcribe, left in the box to check before asking
+  const [voice, setVoice] = useState<"idle" | "listening" | "busy">("idle");
+  const [voiceErr, setVoiceErr] = useState("");
+  const recorder = useRef<MediaRecorder | null>(null);
+
+  async function talk() {
+    if (voice === "listening") return recorder.current?.stop();
+    if (voice !== "idle") return;
+    setVoiceErr("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const chunks: Blob[] = [];
+      const r = (recorder.current = new MediaRecorder(stream));
+      r.ondataavailable = (e) => chunks.push(e.data);
+      r.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setVoice("busy");
+        try {
+          const form = new FormData();
+          form.append("audio", new Blob(chunks, { type: r.mimeType }));
+          form.append("lang", lang);
+          const res = await fetch("/api/transcribe", { method: "POST", body: form });
+          const d = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(d.error ?? `HTTP ${res.status}`);
+          setQuestion((q) => (q.trim() ? `${q.trim()} ${d.text}` : d.text).slice(0, 500));
+        } catch (e) {
+          setVoiceErr(tx("voiceError", { e: e instanceof Error ? e.message : String(e) }));
+        } finally {
+          setVoice("idle");
+        }
+      };
+      r.start();
+      setVoice("listening");
+      setTimeout(() => r.state === "recording" && r.stop(), 60_000); // the route keeps a minute at most
+    } catch (e) {
+      setVoiceErr(tx("voiceError", { e: e instanceof Error ? e.message : String(e) }));
+    }
+  }
 
   async function send(q: string) {
     q = q.trim();
@@ -122,6 +160,15 @@ export function CoachChat({ job, onSeek }: { job: Job; onSeek: (sourceSec: numbe
           aria-label={tx("askAria")}
           className="flex-1 rounded border border-black/20 bg-transparent px-2 py-1 text-sm dark:border-white/25"
         />
+        <button
+          type="button"
+          onClick={talk}
+          disabled={busy || voice === "busy"}
+          aria-pressed={voice === "listening"}
+          className={`rounded border px-3 py-1 text-sm disabled:opacity-50 ${voice === "listening" ? "border-red-500 text-red-600 dark:text-red-400" : "border-black/20 dark:border-white/25"}`}
+        >
+          {voice === "listening" ? tx("voiceStop") : voice === "busy" ? tx("voiceBusy") : tx("voiceAsk")}
+        </button>
         {busy ? (
           <button type="button" onClick={() => abort.current?.abort()} className="rounded border border-black/20 px-3 py-1 text-sm dark:border-white/25">
             {tx("stop")}
@@ -132,6 +179,7 @@ export function CoachChat({ job, onSeek }: { job: Job; onSeek: (sourceSec: numbe
           </button>
         )}
       </form>
+      {voiceErr && <p className="text-sm text-red-600">{voiceErr}</p>}
     </div>
   );
 }
