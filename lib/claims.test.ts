@@ -21,6 +21,8 @@ const facts: Fact[] = [
   { player: "A", metric: "minute_distance", value: 52.3, decimals: 1, at: "3:10" },
   { player: "A", metric: "net_visit_count", value: 9, decimals: 0 },
   { player: null, metric: "shown_time", value: "7:30", decimals: 0 },
+  { player: "B", metric: "zone_behind_baseline_low", value: 52, decimals: 0 },
+  { player: "B", metric: "zone_behind_baseline_high", value: 80, decimals: 0 },
 ];
 const en: VerifyOptions = { lang: "en", rough: { A: false, B: true } };
 const tr: VerifyOptions = { ...en, lang: "tr" };
@@ -101,4 +103,10 @@ test("verify: malformed claims are reported, not thrown", () => {
 
 test("sentences: split on line breaks and sentence ends, not inside decimals", () => {
   assert.deepEqual(sentences("Player A ran 567 m. Peak 2.01 m/s!\n## B"), ["Player A ran 567 m.", "Peak 2.01 m/s!", "## B"]);
+});
+
+test("verify: a rough player's zone share given as its range", () => {
+  const claims = [c("B", "zone_behind_baseline", 66, "%"), c("B", "zone_behind_baseline_low", 52, "%"), c("B", "zone_behind_baseline_high", 80, "%")];
+  assert.deepEqual(why("Player B was behind the baseline about 66% of the time, somewhere between 52% and 80%.", claims), []);
+  assert.deepEqual(why("Player B was behind the baseline between 52% and 85% of the time.", claims.slice(1)), ["85%: not backed by a claim"]);
 });

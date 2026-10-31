@@ -2,12 +2,13 @@
 // calibration turns their feet into SAM-like boxes with noise matched to real footage (box-bottom jitter, the net cutting
 // the far player's box short); the app's own analyze() measures them, and evaluate() compares that with the truth.
 import { applyHomography, CALIBRATION_POINTS, COURT, solveHomography, type Pt } from "../lib/court.ts";
-import { analyze, playerPositions, type Box, type PlayerMetrics, type Tracks } from "../lib/metrics.ts";
+import { analyze, playerPositions, type Box, type Method, type PlayerMetrics, type Tracks } from "../lib/metrics.ts";
 
 export const REAL_CALIBRATION: Pt[] = [[299, 739], [1683, 750], [1331, 583], [635, 582]]; // clicked on the coach's session
 export type Sample = { f: number; x: number; y: number };
 // rho: frame-to-frame correlation of the jitter (AR(1)); SAM's box edges wander over several frames rather than flicker
-export type Noise = { bottomPx: number; xPx: number; rho: number; occludeP: number; occludeMaxPx: number; dropP: number };
+// shortPx: how far above the feet the box ends on average (hand-marked frames: ~2 px for the far player)
+export type Noise = { bottomPx: number; xPx: number; rho: number; occludeP: number; occludeMaxPx: number; dropP: number; shortPx?: number };
 export type BoxModel = { a: number; b: number }; // box height in px = a + b * foot row
 export type Leg = { to: Pt; speed: number; pause?: number };
 
@@ -71,7 +72,7 @@ export function render(truth: Sample[], imagePts: Pt[], model: BoxModel, noise: 
     if (r() < noise.dropP) continue;
     const [u, v] = applyHomography(toImage, [s.x, s.y]);
     const h = model.a + model.b * v;
-    let bottom = v + eb;
+    let bottom = v + eb - (noise.shortPx ?? 0);
     if (s.y > COURT.net && r() < noise.occludeP) bottom -= r() * noise.occludeMaxPx; // the net hides the feet: the box ends higher
     const cx = u + ex;
     boxes.push([s.f, cx - 0.2 * h, v - h + et, cx + 0.2 * h, bottom, 0.9]);
@@ -180,7 +181,7 @@ export function farFixShift(tracks: Tracks, imagePts: Pt[], ids: string[]): numb
 
 export type SimRun = { truth: [Sample[], Sample[]]; metrics: PlayerMetrics[]; errors: [Errors, Errors]; tracks: Tracks };
 
-export function simulate(opts: { seed: number; fps?: number; seconds?: number; imagePts?: Pt[]; model: BoxModel; near: Noise; far: Noise }): SimRun {
+export function simulate(opts: { seed: number; fps?: number; seconds?: number; imagePts?: Pt[]; model: BoxModel; near: Noise; far: Noise; method?: Method }): SimRun {
   const fps = opts.fps ?? 15;
   const frames = Math.round((opts.seconds ?? 300) * fps);
   const imagePts = opts.imagePts ?? REAL_CALIBRATION;
@@ -190,7 +191,7 @@ export function simulate(opts: { seed: number; fps?: number; seconds?: number; i
     fps, width: 1920, height: 1080, frames,
     objects: { "1": render(near, imagePts, opts.model, opts.near, opts.seed), "2": render(far, imagePts, opts.model, opts.far, opts.seed + 1000) },
   };
-  const metrics = analyze(tracks, imagePts);
-  const positions = playerPositions(tracks, imagePts);
+  const metrics = analyze(tracks, imagePts, opts.method);
+  const positions = playerPositions(tracks, imagePts, opts.method);
   return { truth: [near, far], metrics, tracks, errors: [evaluate(near, metrics[0], positions[0].smoothed, fps), evaluate(far, metrics[1], positions[1].smoothed, fps)] };
 }

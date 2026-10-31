@@ -11,6 +11,16 @@ const MAX_SPEED = 8; // m/s; faster steps are tracking jumps, not running
 const MAX_GAP = 3; // frames; longer gaps split a track into segments
 const RELIABLE_NOISE = 0.3; // m; above this frame-to-frame depth noise, distance/speed/zones are rough
 const HEAT = { x0: -9, y0: -8, cols: 18, rows: 40 }; // 1 m cells covering the court plus run-off
+// Position error in image pixels, measured against hand-marked feet on the coach's session (validate/annotate, 40
+// frames): it turns into meters through the camera, so it grows with distance. Zone shares get a range from it.
+const SIGMA_PX = { near: 24, far: 2.5 }; // near: mostly a constant offset (the box ends at the front foot); far: SAM's box-bottom wander
+
+// How positions are computed. V1 is the hackathon version, kept to measure against; V2 follows the hand-marked frames.
+// reliableSigmaM: also call distance, speeds and zones rough when the median expected depth error is above this; jitter
+// alone can look low once the far track is smoothed, while the hand marks show ~1 m of depth error on the far side
+export type Method = { farFix: "max" | "envelope"; quantile: number; farDepthSeconds: number; reliableSigmaM?: number };
+export const V1: Method = { farFix: "max", quantile: 1, farDepthSeconds: 1 };
+export const V2: Method = { farFix: "envelope", quantile: 0.9, farDepthSeconds: 2, reliableSigmaM: 0.6 };
 
 export type PlayerMetrics = {
   player: "A" | "B";
@@ -21,6 +31,7 @@ export type PlayerMetrics = {
   avgSpeed: number; // m/s over tracked time
   peakSpeed: number; // m/s, 95th percentile of 0.5 s windows
   zones: { behindBaseline: number; baseline: number; midCourt: number; net: number }; // shares of tracked time
+  zoneRanges: Record<keyof PlayerMetrics["zones"], [number, number]>; // clearly in the zone .. possibly in it, given the position error
   lateral: { left: number; center: number; right: number }; // thirds of the singles width, from the player's own view
   perMinuteM: number[];
   sideChangesAt: number[]; // seconds into the clip
@@ -34,15 +45,17 @@ export type PlayerPositions = {
   objectFrames: PlayerMetrics["objectFrames"];
   raw: Sample[][];
   smoothed: Sample[][]; // the positions every metric is measured on
+  depthSigma: number[][]; // m, expected depth error of each smoothed position
 };
 
-export function analyze(tracks: Tracks, imagePts: Pt[]): PlayerMetrics[] {
-  return playerPositions(tracks, imagePts).map((p, i) => playerMetrics(i === 0 ? "A" : "B", p, tracks));
+export function analyze(tracks: Tracks, imagePts: Pt[], method = V2): PlayerMetrics[] {
+  return playerPositions(tracks, imagePts, method).map((p, i) => playerMetrics(i === 0 ? "A" : "B", p, tracks, method));
 }
 
 // Both players' court positions per frame, [A, B]. Player A starts on the near side.
-export function playerPositions(tracks: Tracks, imagePts: Pt[]): PlayerPositions[] {
+export function playerPositions(tracks: Tracks, imagePts: Pt[], method = V2): PlayerPositions[] {
   const H = solveHomography(imagePts, CALIBRATION_POINTS.map((p) => p.world));
+  const toImage = solveHomography(CALIBRATION_POINTS.map((p) => p.world), imagePts);
   const half = Math.round(tracks.fps / 2);
   const byFrame = new Map<number, Det[]>();
   for (const [id, boxes] of Object.entries(tracks.objects)) {
@@ -51,14 +64,7 @@ export function playerPositions(tracks: Tracks, imagePts: Pt[]): PlayerPositions
       // cut off by a frame edge: the feet (bottom) or the body's center (sides) is not where the box says
       if (b >= tracks.height - 2 || l <= 1 || r >= tracks.width - 2) continue;
       let [x, y] = applyHomography(H, [(l + r) / 2, b]);
-      if (y > COURT.net) {
-        // Far side: the net hides the feet now and then, which only ever cuts the box short from below,
-        // so the lowest box bottom within +-0.5 s is the real foot row. Cuts depth noise ~4x on real footage.
-        let low = b;
-        for (let j = i - 1; j >= 0 && f - boxes[j][0] <= half; j--) low = Math.max(low, boxes[j][4]);
-        for (let j = i + 1; j < boxes.length && boxes[j][0] - f <= half; j++) low = Math.max(low, boxes[j][4]);
-        [x, y] = applyHomography(H, [(l + r) / 2, low]);
-      }
+      if (y > COURT.net) [x, y] = applyHomography(H, [(l + r) / 2, farBottom(boxes, i, half, method)]);
       // drop people outside the court and its run-off (e.g. on the next court)
       if (Math.abs(x) > COURT.doublesHalf + 3 || y < -8 || y > COURT.length + 8) continue;
       if (!byFrame.has(f)) byFrame.set(f, []);
@@ -107,12 +113,21 @@ export function playerPositions(tracks: Tracks, imagePts: Pt[]): PlayerPositions
 
   return series.map((s, i) => {
     const raw = split(s);
-    return { objectFrames: Object.fromEntries([...spans].filter(([id]) => idToPlayer.get(id) === i)), raw, smoothed: smooth(raw, Math.max(1, half)) };
+    const smoothed = smooth(raw, Math.max(1, half), Math.max(1, Math.round((method.farDepthSeconds * tracks.fps) / 2)));
+    // a pixel of error at this spot, in meters of depth
+    const perPx = (q: Sample) => {
+      const [u, v] = applyHomography(toImage, [q.x, q.y]);
+      return Math.abs(applyHomography(H, [u, v + 1])[1] - q.y);
+    };
+    const depthSigma = smoothed.map((seg) => seg.map((q) => SIGMA_PX[q.y > COURT.net ? "far" : "near"] * perPx(q)));
+    return { objectFrames: Object.fromEntries([...spans].filter(([id]) => idToPlayer.get(id) === i)), raw, smoothed, depthSigma };
   });
 }
 
-function playerMetrics(player: "A" | "B", { objectFrames, raw: rawSegments, smoothed: segments }: PlayerPositions, { fps, frames }: Tracks): PlayerMetrics {
+function playerMetrics(player: "A" | "B", { objectFrames, raw: rawSegments, smoothed: segments, depthSigma }: PlayerPositions, { fps, frames }: Tracks, method: Method): PlayerMetrics {
   const half = Math.max(1, Math.round(fps / 2));
+  // speeds over 0.5 s come from the ~1 s average: the longer far-side depth window would flatten real bursts
+  const second = smooth(rawSegments, half, half);
   let distanceM = 0;
   const perMinuteM: number[] = [];
   const speeds: number[] = [];
@@ -124,6 +139,8 @@ function playerMetrics(player: "A" | "B", { objectFrames, raw: rawSegments, smoo
       const m = Math.floor(seg[i].f / fps / 60);
       perMinuteM[m] = (perMinuteM[m] ?? 0) + step;
     }
+  }
+  for (const seg of second) {
     for (let i = 0; i + half < seg.length; i++) {
       const v = dist(seg[i], seg[i + half]) / ((seg[i + half].f - seg[i].f) / fps);
       if (v <= MAX_SPEED) speeds.push(v);
@@ -131,12 +148,17 @@ function playerMetrics(player: "A" | "B", { objectFrames, raw: rawSegments, smoo
   }
 
   const all = segments.flat();
+  const sigmas = depthSigma.flat();
   const zones = { behindBaseline: 0, baseline: 0, midCourt: 0, net: 0 };
+  // a zone's range: the time the whole +-sigma depth interval lay inside it .. the time the interval touched it
+  const bounds = { behindBaseline: [-Infinity, 0], baseline: [0, 2], midCourt: [2, COURT.serviceFromBaseline], net: [COURT.serviceFromBaseline, Infinity] };
+  const clearly = { behindBaseline: 0, baseline: 0, midCourt: 0, net: 0 };
+  const possibly = { behindBaseline: 0, baseline: 0, midCourt: 0, net: 0 };
   const lateral = { left: 0, center: 0, right: 0 };
   const counts = new Array(HEAT.cols * HEAT.rows).fill(0);
   const sideChangesAt: number[] = [];
   let side = null as "near" | "far" | null;
-  for (const s of all) {
+  all.forEach((s, si) => {
     // hysteresis around the net so jitter does not count as a side change
     const now: typeof side = s.y < COURT.net - 2 ? "near" : s.y > COURT.net + 2 ? "far" : side;
     if (side && now !== side) sideChangesAt.push(+(s.f / fps).toFixed(1));
@@ -144,23 +166,29 @@ function playerMetrics(player: "A" | "B", { objectFrames, raw: rawSegments, smoo
     const p = place(s, side);
     zones[p.zone]++;
     lateral[p.lateral]++;
+    const d = side === "far" ? COURT.length - s.y : s.y, e = sigmas[si];
+    for (const [k, [lo, hi]] of Object.entries(bounds) as [keyof typeof zones, number[]][]) {
+      if (d - e >= lo && d + e < hi) clearly[k]++;
+      if (d + e >= lo && d - e < hi) possibly[k]++;
+    }
     const cx = Math.floor(s.x - HEAT.x0);
     const cy = Math.floor(s.y - HEAT.y0);
     if (cx >= 0 && cx < HEAT.cols && cy >= 0 && cy < HEAT.rows) counts[cy * HEAT.cols + cx]++;
-  }
+  });
   const n = all.length || 1;
   for (const k of Object.keys(zones) as (keyof typeof zones)[]) zones[k] = round(zones[k] / n, 3);
   for (const k of Object.keys(lateral) as (keyof typeof lateral)[]) lateral[k] = round(lateral[k] / n, 3);
+  const zoneRanges = Object.fromEntries(Object.keys(zones).map((k) => [k, [round(clearly[k as keyof typeof zones] / n, 3), round(possibly[k as keyof typeof zones] / n, 3)]])) as PlayerMetrics["zoneRanges"];
   const seconds = all.length / fps;
   speeds.sort((a, b) => a - b);
 
-  // Depth jitter = raw minus smoothed, interior samples only (edge windows are shrunk). Real footwork adds a
+  // Depth jitter = raw minus a ~1 s average, interior samples only (edge windows are shrunk). Real footwork adds a
   // little too, but on real footage the near player sits at ~0.1 m and a net-occluded far player at ~0.5 m.
   let sq = 0;
   let cnt = 0;
   rawSegments.forEach((seg, si) => {
     for (let i = half; i < seg.length - half; i++) {
-      sq += (seg[i].y - segments[si][i].y) ** 2;
+      sq += (seg[i].y - second[si][i].y) ** 2;
       cnt++;
     }
   });
@@ -175,12 +203,13 @@ function playerMetrics(player: "A" | "B", { objectFrames, raw: rawSegments, smoo
     avgSpeed: round(seconds ? distanceM / seconds : 0, 2),
     peakSpeed: round(speeds[Math.floor(speeds.length * 0.95)] ?? 0, 2),
     zones,
+    zoneRanges,
     lateral,
     // full minutes only: a short last minute would read as a sudden drop
     perMinuteM: Array.from({ length: Math.floor(frames / fps / 60) }, (_, i) => round(perMinuteM[i] ?? 0, 1)),
     sideChangesAt,
     depthNoiseM: round(depthNoiseM, 2),
-    reliable: cnt > 0 && depthNoiseM <= RELIABLE_NOISE,
+    reliable: cnt > 0 && depthNoiseM <= RELIABLE_NOISE && !(sigmas.slice().sort((a, b) => a - b)[Math.floor(sigmas.length / 2)] > (method.reliableSigmaM ?? Infinity)),
     heatmap: { ...HEAT, counts },
   };
 }
@@ -195,17 +224,43 @@ function split(s: Sample[]): Sample[][] {
   return out;
 }
 
-// Centered ~1 s moving average. Box bottoms jitter a few pixels per frame, and on the far side one pixel
-// is ~0.3 m, so shorter windows double the far player's distance. The window shrinks symmetrically at
-// segment edges so steady motion keeps its full length.
-function smooth(segs: Sample[][], half: number): Sample[][] {
-  return segs.map((seg) =>
-    seg.map((p, i) => {
-      const k = Math.min(half, i, seg.length - 1 - i);
-      const w = seg.slice(i - k, i + k + 1);
-      return { f: p.f, x: w.reduce((a, q) => a + q.x, 0) / w.length, y: w.reduce((a, q) => a + q.y, 0) / w.length };
-    }),
-  );
+// Centered moving average, ~1 s (half frames each side). Box bottoms jitter a few pixels per frame, and on the far
+// side one pixel is ~0.5 m of depth, so there depth gets farHalf instead; across the court and on the near side a
+// longer window only lags. The window shrinks symmetrically at segment edges so steady motion keeps its full length.
+function smooth(segs: Sample[][], half: number, farHalf: number): Sample[][] {
+  const avg = (seg: Sample[], i: number, h: number, k: "x" | "y") => {
+    const w = Math.min(h, i, seg.length - 1 - i);
+    let sum = 0;
+    for (let j = i - w; j <= i + w; j++) sum += seg[j][k];
+    return sum / (2 * w + 1);
+  };
+  return segs.map((seg) => seg.map((p, i) => ({ f: p.f, x: avg(seg, i, half, "x"), y: avg(seg, i, p.y > COURT.net ? farHalf : half, "y") })));
+}
+
+// Far side: SAM's box usually ends a little above the feet (median ~2 px on the hand-marked frames) and the net
+// sometimes cuts it shorter, never lower, so the foot row is the lower envelope of the bottoms nearby (+-0.5 s).
+// V1 took the lowest bottom in the window, which also pulls a player moving in depth toward the camera; V2 takes a
+// line fitted to the window's bottoms (the motion) plus the given quantile of the bottoms' distance from it.
+function farBottom(boxes: Box[], i: number, half: number, m: Method): number {
+  const f = boxes[i][0];
+  const win: [number, number][] = [];
+  for (let j = i; j >= 0 && f - boxes[j][0] <= half; j--) win.push([boxes[j][0] - f, boxes[j][4]]);
+  for (let j = i + 1; j < boxes.length && boxes[j][0] - f <= half; j++) win.push([boxes[j][0] - f, boxes[j][4]]);
+  if (m.farFix === "max") return Math.max(...win.map((w) => w[1]));
+  // as wide on both sides, so the line is read at its middle and its slope cannot tip the estimate; right at a track's
+  // ends there is no such window, so there the envelope is taken flat over the one-sided window
+  const k = Math.min(-Math.min(...win.map((w) => w[0])), Math.max(...win.map((w) => w[0])));
+  const even = k >= 2 ? win.filter(([t]) => Math.abs(t) <= k) : win;
+  const trend = k >= 2 ? fitLine(even) : fitLine(even.map(([, r]) => [0, r]));
+  const res = even.map(([t, r]) => r - trend(t)).sort((a, b) => a - b);
+  return trend(0) + res[Math.min(res.length - 1, Math.floor(m.quantile * res.length))];
+}
+
+function fitLine(pts: [number, number][]): (t: number) => number {
+  const mt = pts.reduce((a, p) => a + p[0], 0) / pts.length, mr = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+  const vt = pts.reduce((a, p) => a + (p[0] - mt) ** 2, 0);
+  const slope = vt ? pts.reduce((a, p) => a + (p[0] - mt) * (p[1] - mr), 0) / vt : 0;
+  return (t) => mr + slope * (t - mt);
 }
 
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);

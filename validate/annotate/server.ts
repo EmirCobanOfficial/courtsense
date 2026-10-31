@@ -1,9 +1,10 @@
 // Step 3: the local page for hand-marking the players' feet. Listens on 127.0.0.1 only and answers only requests
 // addressed to it, so the frames and marks never leave this machine. Marks are saved on every change; a copy is kept
 // at every start and before any save that has fewer marks, and a page opened before the last save cannot overwrite it.
-// usage (from the repo root): node validate/annotate/pick.ts, then node validate/annotate/server.ts [--port 3461]
+// usage (from the repo root): node validate/annotate/pick.ts, then node validate/annotate/server.ts [--port 3461] [--set test]
 import fs from "node:fs";
 import http from "node:http";
+import path from "node:path";
 import { DIR, JOB, LABELS, type Labels, type Manifest } from "./system.ts";
 
 const portArg = process.argv.indexOf("--port");
@@ -21,7 +22,7 @@ const read = (): Saved | null => (fs.existsSync(LABELS) ? JSON.parse(fs.readFile
 const count = (l: Labels) => Object.values(l).reduce((n, m) => n + Object.keys(m).length, 0);
 function backup(why: string) {
   fs.mkdirSync(BACKUPS, { recursive: true });
-  fs.copyFileSync(LABELS, `${BACKUPS}/annotations-${new Date().toISOString().replace(/[:.]/g, "-")}-${why}.json`);
+  fs.copyFileSync(LABELS, `${BACKUPS}/${path.basename(LABELS, ".json")}-${new Date().toISOString().replace(/[:.]/g, "-")}-${why}.json`);
 }
 const atStart = read();
 if (atStart && count(atStart.labels)) backup("start");

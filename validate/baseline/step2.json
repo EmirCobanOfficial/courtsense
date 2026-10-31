@@ -1,0 +1,197 @@
+{
+ "generatedAt": "2026-10-31T10:09:06.671Z",
+ "commit": "a6c7b69",
+ "V1": {
+  "farFix": "max",
+  "quantile": 1,
+  "farDepthSeconds": 1
+ },
+ "V2": {
+  "farFix": "envelope",
+  "quantile": 0.9,
+  "farDepthSeconds": 2,
+  "reliableSigmaM": 0.6
+ },
+ "targets": {
+  "shortPx": 2.12,
+  "biasM": -0.26,
+  "rmseM": 1.15
+ },
+ "farMarks": {
+  "bottomPx": 2.5,
+  "xPx": 2.5,
+  "rho": 0.9,
+  "occludeP": 0,
+  "occludeMaxPx": 0,
+  "dropP": 0.007000000000000006,
+  "shortPx": 2
+ },
+ "results": {
+  "Phase 0 noise model": {
+   "A": {
+    "V1": {
+     "distance error %": -1.14,
+     "avg speed error m/s": 0.11,
+     "peak speed error m/s": -0.4,
+     "depth RMSE m": 0.1,
+     "lateral RMSE m": 0.12,
+     "behindBaseline share error pp": -0.6,
+     "baseline share error pp": 0.47,
+     "midCourt share error pp": 0.13,
+     "net share error pp": 0,
+     "zone ranges holding the truth": "20/20",
+     "flagged reliable": "5/5"
+    },
+    "V2": {
+     "distance error %": -1.14,
+     "avg speed error m/s": 0.11,
+     "peak speed error m/s": -0.4,
+     "depth RMSE m": 0.1,
+     "lateral RMSE m": 0.12,
+     "behindBaseline share error pp": -0.6,
+     "baseline share error pp": 0.47,
+     "midCourt share error pp": 0.13,
+     "net share error pp": 0,
+     "zone ranges holding the truth": "20/20",
+     "flagged reliable": "5/5"
+    }
+   },
+   "B": {
+    "V1": {
+     "distance error %": 5,
+     "avg speed error m/s": 0.09,
+     "peak speed error m/s": -0.37,
+     "depth RMSE m": 1.19,
+     "lateral RMSE m": 0.16,
+     "behindBaseline share error pp": -27.16,
+     "baseline share error pp": 16.63,
+     "midCourt share error pp": 6.71,
+     "net share error pp": 3.8,
+     "zone ranges holding the truth": "11/20",
+     "flagged reliable": "5/5"
+    },
+    "V2": {
+     "distance error %": 0.02,
+     "avg speed error m/s": 0.01,
+     "peak speed error m/s": -0.42,
+     "depth RMSE m": 0.9,
+     "lateral RMSE m": 0.14,
+     "behindBaseline share error pp": -17.18,
+     "baseline share error pp": 13.43,
+     "midCourt share error pp": 2.55,
+     "net share error pp": 1.2,
+     "zone ranges holding the truth": "18/20",
+     "flagged reliable": "0/5"
+    }
+   }
+  },
+  "far noise matched to the hand marks": {
+   "A": {
+    "V1": {
+     "distance error %": -1.14,
+     "avg speed error m/s": 0.11,
+     "peak speed error m/s": -0.4,
+     "depth RMSE m": 0.1,
+     "lateral RMSE m": 0.12,
+     "behindBaseline share error pp": -0.6,
+     "baseline share error pp": 0.47,
+     "midCourt share error pp": 0.13,
+     "net share error pp": 0,
+     "zone ranges holding the truth": "20/20",
+     "flagged reliable": "5/5"
+    },
+    "V2": {
+     "distance error %": -1.14,
+     "avg speed error m/s": 0.11,
+     "peak speed error m/s": -0.4,
+     "depth RMSE m": 0.1,
+     "lateral RMSE m": 0.12,
+     "behindBaseline share error pp": -0.6,
+     "baseline share error pp": 0.47,
+     "midCourt share error pp": 0.13,
+     "net share error pp": 0,
+     "zone ranges holding the truth": "20/20",
+     "flagged reliable": "5/5"
+    }
+   },
+   "B": {
+    "V1": {
+     "distance error %": 16.22,
+     "avg speed error m/s": 0.26,
+     "peak speed error m/s": -0.13,
+     "depth RMSE m": 1.01,
+     "lateral RMSE m": 0.15,
+     "behindBaseline share error pp": -18.58,
+     "baseline share error pp": 11.99,
+     "midCourt share error pp": 4.47,
+     "net share error pp": 2.08,
+     "zone ranges holding the truth": "14/20",
+     "flagged reliable": "0/5"
+    },
+    "V2": {
+     "distance error %": 6.45,
+     "avg speed error m/s": 0.11,
+     "peak speed error m/s": -0.13,
+     "depth RMSE m": 0.87,
+     "lateral RMSE m": 0.13,
+     "behindBaseline share error pp": -4.08,
+     "baseline share error pp": 3.93,
+     "midCourt share error pp": -0.17,
+     "net share error pp": 0.32,
+     "zone ranges holding the truth": "20/20",
+     "flagged reliable": "0/5"
+    }
+   }
+  },
+  "session": {
+   "A": {
+    "V1": {
+     "distance m": 567,
+     "avg speed m/s": 0.92,
+     "peak speed m/s": 2.01,
+     "depth noise m": 0.11,
+     "reliable": true,
+     "behindBaseline %": "67.1 (63-72)",
+     "baseline %": "11.5 (5-20)",
+     "midCourt %": "10.9 (4-18)",
+     "net %": "10.5 (6-14)"
+    },
+    "V2": {
+     "distance m": 567,
+     "avg speed m/s": 0.92,
+     "peak speed m/s": 2.01,
+     "depth noise m": 0.11,
+     "reliable": true,
+     "behindBaseline %": "67.1 (63-72)",
+     "baseline %": "11.5 (5-20)",
+     "midCourt %": "10.9 (4-18)",
+     "net %": "10.5 (6-14)"
+    }
+   },
+   "B": {
+    "V1": {
+     "distance m": 752.1,
+     "avg speed m/s": 1.13,
+     "peak speed m/s": 3.02,
+     "depth noise m": 0.41,
+     "reliable": false,
+     "behindBaseline %": "66.1 (44-75)",
+     "baseline %": "14.3 (0-40)",
+     "midCourt %": "9.1 (4-17)",
+     "net %": "10.4 (9-12)"
+    },
+    "V2": {
+     "distance m": 650.2,
+     "avg speed m/s": 0.98,
+     "peak speed m/s": 3.07,
+     "depth noise m": 0.43,
+     "reliable": false,
+     "behindBaseline %": "71.9 (52-80)",
+     "baseline %": "11.7 (0-34)",
+     "midCourt %": "6.5 (3-13)",
+     "net %": "9.9 (8-11)"
+    }
+   }
+  }
+ }
+}

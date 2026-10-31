@@ -2,11 +2,16 @@
 // machine only), and what the app computed for one player in one frame.
 import { applyHomography, CALIBRATION_POINTS, solveHomography, type Pt } from "../../lib/court.ts";
 import { jobFile, readJob, readTracks } from "../../lib/jobs.ts";
-import { playerPositions, type Box, type Sample } from "../../lib/metrics.ts";
+import { playerPositions, V2, type Box, type Method, type Sample } from "../../lib/metrics.ts";
 
 export const JOB = "d8650763e4d0";
-export const DIR = `data/validation/annotate/${JOB}`;
-export const LABELS = `data/validation/annotations-${JOB}.json`;
+// --set <name>: a separate set of frames and marks, e.g. "test" for frames kept out of Step 2's design
+const setArg = process.argv.indexOf("--set");
+export const SET = setArg > 0 ? process.argv[setArg + 1] : "";
+if (SET && !/^[a-z0-9-]{1,20}$/.test(SET)) throw new Error("--set must be 1-20 lowercase letters, digits or dashes");
+export const DESIGN_DIR = `data/validation/annotate/${JOB}`;
+export const DIR = SET ? `${DESIGN_DIR}-${SET}` : DESIGN_DIR;
+export const LABELS = `data/validation/annotations-${JOB}${SET ? `-${SET}` : ""}.json`;
 export type Mark = Pt | "hidden";
 export type Labels = Record<string, Partial<Record<"A" | "B", Mark>>>;
 export type Manifest = {
@@ -14,7 +19,7 @@ export type Manifest = {
   frames: { id: string; f: number; file: string; sourceTime: string; repeatOf?: string; players: Partial<Record<"A" | "B", { tag: Pt; view: [number, number, number] }>> }[];
 };
 
-export function loadSystem() {
+export function loadSystem(method: Method = V2) {
   const job = readJob(JOB);
   const tracks = job && readTracks(job);
   if (!job?.calibration || !tracks) throw new Error(`job ${JOB} has no calibration or tracks on this machine`);
@@ -25,7 +30,7 @@ export function loadSystem() {
     toCourt: solveHomography(job.calibration, world),
     toImage: solveHomography(world, job.calibration),
     boxes: new Map(Object.entries(tracks.objects).map(([id, boxes]) => [id, new Map(boxes.map((b) => [b[0], b]))])),
-    players: playerPositions(tracks, job.calibration).map((p) => ({ objectFrames: p.objectFrames, raw: byFrame(p.raw), smoothed: byFrame(p.smoothed) })),
+    players: playerPositions(tracks, job.calibration, method).map((p) => ({ objectFrames: p.objectFrames, raw: byFrame(p.raw), smoothed: byFrame(p.smoothed) })),
   };
 }
 export type System = ReturnType<typeof loadSystem>;

@@ -96,7 +96,14 @@ export function sessionFacts(s: Session): Fact[] {
     add(p, "avg_speed", v.avgSpeedMs, 2);
     add(p, "peak_speed", v.peakSpeedMs, 2);
     add(p, "depth_noise", v.depthNoiseM, 2);
-    for (const [k, metric] of Object.entries(ZONE_METRIC)) add(p, metric, v.zonesPct[k]);
+    for (const [k, metric] of Object.entries(ZONE_METRIC)) {
+      add(p, metric, v.zonesPct[k]);
+      const range = (v.zoneRangesPct as Record<string, [number, number]> | undefined)?.[k];
+      if (range) {
+        add(p, `${metric}_low` as Metric, range[0]);
+        add(p, `${metric}_high` as Metric, range[1]);
+      }
+    }
     for (const k of ["left", "center", "right"]) add(p, `lateral_${k}` as Metric, v.lateralPct[k]);
     v.sideChanges.forEach((t) => add(p, "side_change_time", t));
     m.perMinuteM.forEach((meters, i) => add(p, "minute_distance", meters, 1, mmss(s.job.startSec + i * 60)));
@@ -142,7 +149,10 @@ function playerMetricsView(s: Session, m: PlayerMetrics) {
     zonesPct: Object.fromEntries(Object.entries(m.zones).map(([k, v]) => [k, pct(v)])),
     lateralPct: Object.fromEntries(Object.entries(m.lateral).map(([k, v]) => [k, pct(v)])),
     sideChanges: m.sideChangesAt.map((t) => mmss(src(s, t))),
-    ...(m.reliable ? {} : { note: "Depth is noisy for this player: distance, speeds and zones are rough; left/center/right is reliable." }),
+    ...(m.reliable ? {} : {
+      zoneRangesPct: Object.fromEntries(Object.entries(m.zoneRanges).map(([k, [lo, hi]]) => [k, [pct(lo), pct(hi)]])),
+      note: "Depth is uncertain for this player (about 1 m on hand-marked frames): distance, speeds and zones are rough. zoneRangesPct gives each zone's share as [clearly in it, possibly in it]; say the range rather than the single share. Left/center/right is reliable.",
+    }),
   };
 }
 

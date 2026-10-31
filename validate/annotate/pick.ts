@@ -1,18 +1,24 @@
 // Step 3: pick frames of the coach's session for hand-marking both players' feet and save them as JPEGs (local, free).
 // The frames are spread evenly over the frames where the app tracked both players. Five of them come back at the end
 // to measure how repeatable the hand marks are. Everything stays in data/ (git-ignored) on this machine.
-// usage (from the repo root): node validate/annotate/pick.ts [--n 40]
+// With --set <name> the frames are a separate set that keeps 3 s away from the first set's frames (a held-out test).
+// usage (from the repo root): node validate/annotate/pick.ts [--n 40] [--set test]
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
-import { DIR, loadSystem, systemAt, type Manifest } from "./system.ts";
+import { DESIGN_DIR, DIR, loadSystem, SET, systemAt, type Manifest } from "./system.ts";
 
 const nArg = process.argv.indexOf("--n");
 const N = nArg > 0 ? Number(process.argv[nArg + 1]) : 40;
 if (!(N >= 5 && N <= 200)) throw new Error("--n must be 5-200");
 
+// marks are keyed by these frames: picking again would orphan them
+if (fs.existsSync(`${DIR}/frames.json`) && !process.argv.includes("--force")) throw new Error(`${DIR}/frames.json exists and its frames may be marked already; use --set <name> for a new set`);
 const sys = loadSystem();
 const { fps, width, height } = sys.tracks;
-const both = [...sys.players[0].raw.keys()].filter((f) => sys.players[1].raw.has(f) && systemAt(sys, 0, f) && systemAt(sys, 1, f)).sort((a, b) => a - b);
+const taken = SET ? (JSON.parse(fs.readFileSync(`${DESIGN_DIR}/frames.json`, "utf8")) as Manifest).frames.map((x) => x.f) : [];
+const both = [...sys.players[0].raw.keys()]
+  .filter((f) => sys.players[1].raw.has(f) && systemAt(sys, 0, f) && systemAt(sys, 1, f) && taken.every((t) => Math.abs(t - f) > 3 * sys.tracks.fps))
+  .sort((a, b) => a - b);
 const picked = Array.from({ length: N }, (_, i) => both[Math.floor(((i + 0.5) * both.length) / N)]);
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 

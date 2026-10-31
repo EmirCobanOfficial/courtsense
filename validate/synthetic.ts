@@ -1,11 +1,12 @@
-// Accuracy of the current pipeline against a known ground truth (synthetic sessions, see sim.ts).
+// Accuracy of the current pipeline against a known ground truth (synthetic sessions, see sim.ts), with the Phase 0 noise
+// model. validate/step2.ts adds a far-player noise model matched to the hand-marked frames and compares V1 with V2.
 // The noise model is matched to the real session: box height vs. foot row is fitted on its tracks, and the jitter and
 // net-occlusion levels are tuned until the simulated players show the depth noise the app measures on the real ones.
 // usage (from the repo root): node validate/synthetic.ts [--save]
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { readJob, readTracks } from "../lib/jobs.ts";
-import { analyze, playerPositions } from "../lib/metrics.ts";
+import { analyze, playerPositions, V1 } from "../lib/metrics.ts";
 import { farFixShift, REAL_CALIBRATION, simulate, type BoxModel, type Errors, type Noise } from "./sim.ts";
 
 const BASE = "validate/baseline/synthetic.json";
@@ -29,8 +30,8 @@ function realTargets(): Targets {
     if (!saved) throw new Error(`no data for job ${JOB} and no ${BASE} to take the noise model from`);
     return saved.targets;
   }
-  const metrics = analyze(tracks, job.calibration);
-  const players = playerPositions(tracks, job.calibration).map((p) => Object.keys(p.objectFrames));
+  const metrics = analyze(tracks, job.calibration, V1);
+  const players = playerPositions(tracks, job.calibration, V1).map((p) => Object.keys(p.objectFrames));
   const ids = players.flat();
   let sx = 0, sy = 0, sxx = 0, sxy = 0, n = 0;
   for (const id of ids) {
@@ -55,7 +56,7 @@ function realTargets(): Targets {
 // (the depth noise the app reports and the shift the far-side fix applies while the player is slow).
 function tune(t: Targets): { near: Noise; far: Noise; farMatch: { depthNoiseM: number; farFixShiftM: number } } {
   const noise = (bottomPx: number, rho: number, occludeP: number, occludeMaxPx: number, coverage: number): Noise => ({ bottomPx, xPx: bottomPx, rho, occludeP, occludeMaxPx, dropP: 1 - coverage });
-  const sims = (near: Noise, far: Noise) => [11, 12].map((seed) => simulate({ seed, model: t.model, near, far }));
+  const sims = (near: Noise, far: Noise) => [11, 12].map((seed) => simulate({ seed, model: t.model, near, far, method: V1 })); // the noise model was matched under V1
   let near = noise(1, 0.9, 0, 0, t.coverage[0]);
   let best = Infinity;
   for (const px of [0.5, 1, 2, 3, 4, 6]) {

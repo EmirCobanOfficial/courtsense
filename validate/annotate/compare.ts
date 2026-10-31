@@ -3,21 +3,25 @@
 // the error of the SAM box's bottom-center, of the far-side-fixed point the metrics start from, and of the smoothed
 // point they are measured on, with 95% intervals from resampling the frames. In pixels: how far the box bottom sits
 // from the marked feet (what sim.ts's noise model should match). Frames shown twice measure how repeatable the hand
-// marks are. What this does not measure is printed with every result.
-// usage (from the repo root): node validate/annotate/compare.ts [--save] [--self-check]
-//   --save: freeze this result as the before/after baseline, validate/baseline/annotation-compare.json (aggregate
-//           numbers only; the marks themselves stay in data/)
+// marks are. V1 (the hackathon version) and V2 (Step 2) are measured on the same marks, side by side. What this does
+// not measure is printed with every result.
+// usage (from the repo root): node validate/annotate/compare.ts [--set test] [--save] [--self-check]
+//   --save: keep the result in validate/baseline/annotation-compare[-<set>]-step2.json (aggregate numbers only; the
+//           marks stay in data/). The pre-Step-2 record, annotation-compare.json, is never overwritten.
 //   --self-check: marks placed on the box bottoms (the repeats 1 px off) must give zero box error and a 1.41 px repeat
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { applyHomography, COURT, type Pt } from "../../lib/court.ts";
-import { DIR, JOB, LABELS, loadSystem, systemAt, type Labels, type Manifest } from "./system.ts";
+import { V1, V2 } from "../../lib/metrics.ts";
+import { DIR, JOB, LABELS, loadSystem, SET, systemAt, type Labels, type Manifest, type System } from "./system.ts";
 
 const MIN_MARKS = 10; // below this, no numbers at all
 const MIN_SIDE = 10; // below this, a side's numbers are printed but flagged as too few to read
-const BASE = "validate/baseline/annotation-compare.json";
-const sys = loadSystem();
+const BASE = "validate/baseline/annotation-compare.json"; // pre-Step-2 record of the first set (V1)
+const OUT = `validate/baseline/annotation-compare${SET ? `-${SET}` : ""}-step2.json`;
+const sys = loadSystem(V2);
+const sysV1 = loadSystem(V1);
 const M = JSON.parse(fs.readFileSync(`${DIR}/frames.json`, "utf8")) as Manifest;
 const SELF = process.argv.includes("--self-check");
 const L: Labels = SELF
@@ -31,20 +35,24 @@ const git = (...args: string[]) => execFileSync("git", args, { encoding: "utf8" 
 const version = { commit: git("rev-parse", "--short", "HEAD"), uncommittedChanges: git("status", "--porcelain", "--", "lib").length > 0 };
 
 type Row = { player: "A" | "B"; side: string; mark: Pt; markCourt: Pt; s: NonNullable<ReturnType<typeof systemAt>> };
-const rows: Row[] = [];
 const hidden = { A: 0, B: 0 };
 const originals = M.frames.filter((x) => !x.repeatOf);
-for (const fr of originals) {
-  (["A", "B"] as const).forEach((p, i) => {
-    const m = L[fr.id]?.[p];
-    if (m === "hidden") hidden[p]++;
-    const s = Array.isArray(m) ? systemAt(sys, i as 0 | 1, fr.f) : null;
-    if (!s || !Array.isArray(m)) return;
-    const markCourt = applyHomography(sys.toCourt, m);
-    rows.push({ player: p, side: sideOf(markCourt), mark: m, markCourt, s });
-  });
+function rowsOf(system: System): Row[] {
+  const out: Row[] = [];
+  for (const fr of originals) {
+    (["A", "B"] as const).forEach((p, i) => {
+      const m = L[fr.id]?.[p];
+      const s = Array.isArray(m) ? systemAt(system, i as 0 | 1, fr.f) : null;
+      if (!s || !Array.isArray(m)) return;
+      const markCourt = applyHomography(system.toCourt, m);
+      out.push({ player: p, side: sideOf(markCourt), mark: m, markCourt, s });
+    });
+  }
+  return out;
 }
-console.log(`${rows.length} marked positions in ${originals.length} frames; marked not visible: A ${hidden.A}, B ${hidden.B}. App version ${version.commit}${version.uncommittedChanges ? " + uncommitted changes in lib/" : ""}.`);
+for (const fr of originals) for (const p of ["A", "B"] as const) if (L[fr.id]?.[p] === "hidden") hidden[p]++;
+const rows = rowsOf(sys), rowsV1 = rowsOf(sysV1);
+console.log(`${SET ? `set "${SET}": ` : ""}${rows.length} marked positions in ${originals.length} frames; marked not visible: A ${hidden.A}, B ${hidden.B}. App version ${version.commit}${version.uncommittedChanges ? " + uncommitted changes in lib/" : ""}; detailed tables are V2.`);
 if (rows.length < MIN_MARKS) {
   console.log(`Mark at least ${MIN_MARKS} positions (ideally every frame) first: no accuracy numbers yet.`);
   process.exit(0);
@@ -135,14 +143,22 @@ if (SELF) {
   process.exit(0);
 }
 
-// before/after: the frozen baseline against this run
-if (fs.existsSync(BASE) && !process.argv.includes("--save")) {
-  const base = JSON.parse(fs.readFileSync(BASE, "utf8")) as { version: { commit: string }; sides: typeof sides };
-  console.log(`\nchange from the baseline (app ${base.version.commit}), RMSE and depth bias in meters:`);
-  console.table(Object.fromEntries(Object.entries(sides).flatMap(([side, v]) => (["metricsInput", "smoothed"] as const).map((k) => {
-    const b = base.sides[side]?.meters[k], n = v.meters[k];
-    return [`${side} ${k}`, { "RMSE before": b?.rmse.v, "RMSE now": n?.rmse.v, "depth bias before": b?.biasDepth.v, "depth bias now": n?.biasDepth.v }];
-  }))));
+// before/after on the same marks: V1 (hackathon) vs V2 (Step 2), meters
+const before = Object.fromEntries(["near", "far"].map((side) => {
+  const rs = rowsV1.filter((r) => r.side === side);
+  return [side, { metricsInput: meters(rs, (r) => r.s.fixed), smoothed: meters(rs, (r) => r.s.smoothed) }];
+}));
+const beforeAfter = Object.fromEntries(Object.entries(sides).flatMap(([side, v]) => (["metricsInput", "smoothed"] as const).map((k) => {
+  const b = before[side]?.[k], n = v.meters[k];
+  return [`${side} ${k}`, { "RMSE V1": b && show(b.rmse), "RMSE V2": n && show(n.rmse), "depth bias V1": b && show(b.biasDepth), "depth bias V2": n && show(n.biasDepth) }];
+})));
+console.log("\nV1 (hackathon) vs V2 (Step 2) on the same marks, meters; value [95% interval]:");
+console.table(beforeAfter);
+// the first set's V1 numbers must still be the pre-Step-2 record
+if (!SET && fs.existsSync(BASE)) {
+  const base = JSON.parse(fs.readFileSync(BASE, "utf8")) as { sides: Record<string, { meters: Record<string, { rmse: Stat }> }> };
+  const off = Object.entries(before).flatMap(([side, b]) => Object.entries(b).filter(([k, x]) => x && base.sides[side]?.meters[k]?.rmse.v !== x.rmse.v).map(([k]) => `${side} ${k}`));
+  console.log(off.length ? `V1 differs from the pre-Step-2 record in: ${off.join(", ")}` : "V1 matches the pre-Step-2 record (validate/baseline/annotation-compare.json).");
 }
 
 console.log(`
@@ -159,7 +175,7 @@ What these numbers do not show:
 - The hand mark (midway between the feet) and the app's point (bottom-center of the SAM box) are defined differently;
   part of a constant offset can be that definition rather than a tracking error.`);
 
-const result = { job: JOB, version, marked: rows.length, hidden, sides, repeat };
-const out = process.argv.includes("--save") ? BASE : `data/validation/annotation-compare-${JOB}.json`;
+const result = { job: JOB, set: SET || "design", version, marked: rows.length, hidden, sides, before, repeat };
+const out = process.argv.includes("--save") ? OUT : `data/validation/annotation-compare-${JOB}${SET ? `-${SET}` : ""}.json`;
 fs.writeFileSync(out, JSON.stringify(result, null, 1) + "\n");
-console.log(`\nsaved ${out}${out === BASE ? " (the baseline for later before/after runs)" : " (git-ignored)"}`);
+console.log(`\nsaved ${out}${out === OUT ? "" : " (git-ignored)"}`);

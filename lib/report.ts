@@ -21,6 +21,7 @@ Rules:
 - reliable=false means the player's depth jitters more than 0.3 m per frame (depthNoiseM), so their distance, speeds and zones are rough: say so once, give those numbers only as rough, and draw no conclusions or comparisons from them. lateralPct and coveragePct stay usable.
 - If a player's coveragePct is below 60, warn that their numbers are incomplete.
 - zonesPct: behindBaseline = behind their own baseline, baseline = 0-2 m inside it, midCourt = from 2 m to the service line, net = inside the service box.
+- zoneRangesPct (rough players only): each zone's share as [clearly in it, possibly in it], from the measured position error. For those players give the zones as these ranges.
 - lateralPct: left/center/right thirds of the singles width, from the player's own point of view.
 - minutes: meters run in each minute (from = its start); point out a clear trend only if there is one.
 ${CLAIM_RULES(lang)}

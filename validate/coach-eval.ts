@@ -92,5 +92,5 @@ if (process.argv.includes("--save")) {
 } else if (fs.existsSync(BASE)) {
   const base = JSON.parse(fs.readFileSync(BASE, "utf8")) as { score: number; results: { id: string; ok: boolean }[] };
   const moved = results.filter((r) => base.results.some((b) => b.id === r.id) && base.results.find((b) => b.id === r.id)?.ok !== r.ok).map((r) => `${r.id} ${r.ok ? "now passes" : "now fails"}`);
-  console.log(`baseline score ${base.score}/${base.results.length}${moved.length ? `; changed: ${moved.join(", ")}` : "; no case changed"}`);
+  console.log(`baseline score ${base.score}/${base.results.filter((r) => !(r as { extra?: boolean }).extra).length} on the Phase 0 set${moved.length ? `; changed: ${moved.join(", ")}` : "; no case changed"}`);
 }

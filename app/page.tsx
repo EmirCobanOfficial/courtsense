@@ -333,6 +333,9 @@ function Calibration({ job, onSaved }: { job: Job; onSaved: (m: PlayerMetrics[] 
 
 function MetricsTable({ metrics, startSec }: { metrics: PlayerMetrics[]; startSec: number }) {
   const { t, pct } = useT();
+  // a rough player's zone share comes with its range: clearly in the zone .. possibly in it
+  const zone = (k: keyof PlayerMetrics["zones"]) => (m: PlayerMetrics) =>
+    `${pct(m.zones[k])}${m.reliable ? "" : ` (${pct(m.zoneRanges[k][0])}–${pct(m.zoneRanges[k][1])})`}`;
   // third item: the value depends on depth, so it is shown as rough when the player's depth is noisy
   const rows: [Key, (m: PlayerMetrics) => string, boolean?][] = [
     ["m_confidence", (m) => `${t(m.reliable ? "m_good" : "m_low")} (±${m.depthNoiseM.toFixed(2)} m)`],
@@ -340,10 +343,10 @@ function MetricsTable({ metrics, startSec }: { metrics: PlayerMetrics[]; startSe
     ["m_distance", (m) => `${Math.round(m.distanceM)} m`, true],
     ["m_avg", (m) => `${m.avgSpeed.toFixed(2)} m/s`, true],
     ["m_peak", (m) => `${m.peakSpeed.toFixed(2)} m/s`, true],
-    ["m_behind", (m) => pct(m.zones.behindBaseline), true],
-    ["m_baseline", (m) => pct(m.zones.baseline), true],
-    ["m_mid", (m) => pct(m.zones.midCourt), true],
-    ["m_net", (m) => pct(m.zones.net), true],
+    ["m_behind", zone("behindBaseline"), true],
+    ["m_baseline", zone("baseline"), true],
+    ["m_mid", zone("midCourt"), true],
+    ["m_net", zone("net"), true],
     ["m_lateral", (m) => `${pct(m.lateral.left)} / ${pct(m.lateral.center)} / ${pct(m.lateral.right)}`],
     ["m_sides", (m) => (m.sideChangesAt.length ? m.sideChangesAt.map((s) => fmtTime(startSec + s)).join(", ") : "—")],
   ];

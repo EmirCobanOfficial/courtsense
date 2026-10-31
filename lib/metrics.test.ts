@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyHomography, CALIBRATION_POINTS, solveHomography, type Pt } from "./court.ts";
-import { analyze, playerPositions, type Box, type Tracks } from "./metrics.ts";
+import { analyze, playerPositions, V1, V2, type Box, type Tracks } from "./metrics.ts";
 
 // A plausible camera: world meters -> image pixels (perspective, behind the near baseline).
 const imagePts: Pt[] = [[400, 900], [1500, 900], [1250, 600], [650, 600]];
@@ -124,4 +124,45 @@ test("playerPositions: the smoothed positions the metrics measure, split where t
   assert.equal(B.smoothed.flat().length, 60);
   const steps = A.smoothed.reduce((d, s) => d + s.slice(1).reduce((e, p, i) => e + Math.hypot(p.x - s[i].x, p.y - s[i].y), 0), 0);
   assert.equal(analyze(tracks, imagePts)[0].distanceM, +steps.toFixed(1));
+});
+
+// --- Step 2: the far-side foot row and the zone ranges ---
+// A stands on the near baseline; B walks away from the net on the far side at 1 m/s, with clean boxes
+const farBox = (f: number, w: Pt, cutPx = 0): Box => {
+  const [u, v] = applyHomography(toImage, w);
+  return [f, u - 10, v - 60, u + 10, v - cutPx, 0.9];
+};
+const fps15 = 15;
+// A stands on the near baseline; B walks away from the net on the far side at 1 m/s, with clean boxes
+const farY = (f: number) => 18 + f / fps15;
+const walkingAway = (cut: (f: number) => number = () => 0): Tracks => {
+  const objects: Record<string, Box[]> = { a: [], b: [] };
+  for (let f = 0; f < 60; f++) {
+    objects.a.push(farBox(f, [0, 1]));
+    objects.b.push(farBox(f, [0, farY(f)], cut(f)));
+  }
+  return { fps: fps15, width: 1920, height: 1080, frames: 60, objects };
+};
+
+test("far-side foot row: V2 follows a moving player, V1's lowest-bottom rule pulls it toward the camera", () => {
+  const err = (m: typeof V1) => playerPositions(walkingAway(), imagePts, m)[1].raw.flat().filter((s) => s.f >= 10 && s.f < 50).map((s) => s.y - farY(s.f));
+  assert.ok(Math.max(...err(V2).map(Math.abs)) < 0.05, `V2 ${Math.max(...err(V2).map(Math.abs))}`);
+  assert.ok(err(V1).every((e) => e < -0.3), `V1 ${err(V1)[0]}`);
+});
+
+test("far-side foot row: a box the net cuts short is put back on the trend", () => {
+  const cutAt = 30;
+  const raw = playerPositions(walkingAway((f) => (f === cutAt ? 8 : 0)), imagePts, V2)[1].raw.flat();
+  const at = raw.find((s) => s.f === cutAt)!;
+  assert.ok(Math.abs(at.y - farY(cutAt)) < 0.3, `cut frame off by ${at.y - farY(cutAt)} m`);
+});
+
+test("near player is the same under V1 and V2; zone ranges hold the zone shares", () => {
+  const [a1, b1] = analyze(walkingAway(), imagePts, V1), [a2, b2] = analyze(walkingAway(), imagePts, V2);
+  assert.deepEqual([a2.distanceM, a2.zones, a2.peakSpeed], [a1.distanceM, a1.zones, a1.peakSpeed]);
+  for (const m of [a2, b2, b1]) {
+    for (const [k, [lo, hi]] of Object.entries(m.zoneRanges)) assert.ok(lo <= m.zones[k as keyof typeof m.zones] && m.zones[k as keyof typeof m.zones] <= hi, `${m.player} ${k}`);
+    const sum = (i: 0 | 1) => Object.values(m.zoneRanges).reduce((s, r) => s + r[i], 0);
+    assert.ok(sum(0) <= 1 + 1e-9 && sum(1) >= 1 - 1e-9);
+  }
 });
