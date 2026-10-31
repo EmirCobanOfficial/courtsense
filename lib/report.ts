@@ -24,7 +24,8 @@ Rules:
 - zoneRangesPct (rough players only): each zone's share as [clearly in it, possibly in it], from the measured position error. For those players give the zones as these ranges.
 - lateralPct: left/center/right thirds of the singles width, from the player's own point of view.
 - minutes: meters run in each minute (from = its start); point out a clear trend only if there is one.
-${CLAIM_RULES(lang)}
+${CLAIM_RULES(lang, true)}
+- Write for a coach: short flowing sentences, not one number per line. Zones in plain words (behind the baseline, at the baseline, mid-court, at the net), never the data keys. Call the players ${lang === "tr" ? "Oyuncu A / Oyuncu B" : "Player A / Player B"}, never he or she.
 ${lang === "tr" ? '- Use Turkish tennis terms: "dip çizgi" (baseline), "servis çizgisi", "servis karesi", "file". No English words.\n' : ""}- No medical, injury or health advice.
 
 Format (Markdown):

@@ -43,13 +43,14 @@ Work with tools, exactly one call per turn:
 ${CLAIM_RULES(lang)}
 Rules: never claim shots, scores or technique; no medical or injury advice; if the data cannot answer the question, say so.`;
 
-// How every number reaching the coach must be stated; shared with the report prompt.
-export const CLAIM_RULES = (lang: Lang) => `Numbers: list every number you write in the text as a claim {player, metric, value, unit, at}.
+// How every number reaching the coach must be stated; shared with the report prompt, where a section heading
+// (## Player A) names the player for the sentences under it.
+export const CLAIM_RULES = (lang: Lang, headings = false) => `Numbers: list every number you write in the text as a claim {player, metric, value, unit, at}.
 - metric: ${Object.keys(METRICS).join(", ")}. unit: m (distance), m/s (speed), % (shares), s (durations), time (m:ss), count.
 - player: A or B; leave it out for window_start, window_end and shown_time (a moment you showed or watched).
 - value: the number as you wrote it, from the data, with the same or fewer decimals (0.92 may become 0.9); whole numbers stay as they are. Never repeat a number from the question that the data does not give.
 - at: the moment's start (m:ss) for minute_distance, fastest_*, run_*, net_visit_*.
-- Name the player before their numbers, in the same sentence (${lang === "tr" ? '"Oyuncu A 400 m koştu"' : '"Player A ran 400 m"'}). Write numbers that are not data in words (${lang === "tr" ? '"üç an", "ikinci dakika"' : '"three moments", "the second minute"'}).
+- Name the player before their numbers, in the same sentence (${lang === "tr" ? '"Oyuncu A 400 m koştu"' : '"Player A ran 400 m"'})${headings ? ", or by the section heading above them; in a section about both players, name the player in each sentence" : ""}. Write numbers that are not data in words (${lang === "tr" ? '"üç an", "ikinci dakika"' : '"three moments", "the second minute"'}).
 - If a player's reliable is false, write ${lang === "tr" ? '"yaklaşık"' : '"about"'} in every sentence with their distance, speed, zone or net-visit numbers, and do not compare those as exact.`;
 
 const PLAYER = { type: "string", enum: ["A", "B"] };
