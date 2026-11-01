@@ -56,9 +56,9 @@ video ──ffmpeg (1080p, 15 fps)──▶ SAM 3.1 "tennis player" ──▶ tr
             4 calibration clicks ──▶ homography (image px → court m)
                                                                    ▼
              playerPositions(): foot points → court meters, bystanders and frame-edge boxes dropped,
-             SAM id reuse handled, far-side foot-row estimate, 1 s smoothing (2 s for far-side depth)
+             SAM id reuse and trades handled, far-side foot-row estimate, 1 s smoothing (2 s far-side depth)
                                                                    ▼
-             metrics · heatmap · masks on video · coach assistant · report
+             metrics · heatmap · masks on video · coach assistant (typed or spoken) · report · practice card
 ```
 
 Details that matter for accuracy:
@@ -162,7 +162,7 @@ The same checks (types, lint, tests, production build) run on GitHub for every p
 
 Upload a video, set the analysis start and end, wait for SAM 3.1, click the four court points, and save.
 
-To try the assistant and the report without any API call, start the app with a scripted local model:
+To try the assistant, the report and the practice card without any API call, start the app with scripted local models:
 
 ```bash
 COURTSENSE_FAKE_MODEL=good MODEL_API_KEY= npm run dev
