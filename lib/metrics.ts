@@ -5,10 +5,13 @@ export type Box = [number, number, number, number, number, number | null];
 export type Tracks = { fps: number; width: number; height: number; frames: number; objects: Record<string, Box[]> };
 
 export type Sample = { f: number; x: number; y: number }; // court meters at clip frame f
-type Det = Sample & { id: string; conf: number };
+type Det = Sample & { id: string; conf: number; rx: number; ry: number }; // rx, ry: the box bottom on court, before the far-side fix
 
 const MAX_SPEED = 8; // m/s; faster steps are tracking jumps, not running
 const MAX_GAP = 3; // frames; longer gaps split a track into segments
+// a player's reach from their last position: MAX_SPEED m/s plus JUMP m of box noise. A far player's box bottom can jump
+// farther when the net cuts it, but away from the near player, and a trade also needs the box within the other's reach.
+const JUMP = 10;
 const RELIABLE_NOISE = 0.3; // m; above this frame-to-frame depth noise, distance/speed/zones are rough
 const HEAT = { x0: -9, y0: -8, cols: 18, rows: 40 }; // 1 m cells covering the court plus run-off
 // Position error in image pixels, measured against hand-marked feet on the coach's session (validate/annotate, 40
@@ -59,36 +62,50 @@ export function playerPositions(tracks: Tracks, imagePts: Pt[], method = V2): Pl
   const half = Math.round(tracks.fps / 2);
   const byFrame = new Map<number, Det[]>();
   for (const [id, boxes] of Object.entries(tracks.objects)) {
+    // the far-side foot row leaves out this id's boxes that stand clearly on the near side (2 m short of the net): after
+    // SAM trades ids, the same id was the near player a moment earlier
+    const raw = boxes.map(([, l, , r, b]) => applyHomography(H, [(l + r) / 2, b]));
+    const farSide = (j: number) => raw[j][1] > COURT.net - 2;
     for (let i = 0; i < boxes.length; i++) {
       const [f, l, , r, b, c] = boxes[i];
       // cut off by a frame edge: the feet (bottom) or the body's center (sides) is not where the box says
       if (b >= tracks.height - 2 || l <= 1 || r >= tracks.width - 2) continue;
-      let [x, y] = applyHomography(H, [(l + r) / 2, b]);
-      if (y > COURT.net) [x, y] = applyHomography(H, [(l + r) / 2, farBottom(boxes, i, half, method)]);
+      const [rx, ry] = raw[i];
+      let [x, y] = [rx, ry];
+      if (y > COURT.net) [x, y] = applyHomography(H, [(l + r) / 2, farBottom(boxes, i, half, method, farSide)]);
       // drop people outside the court and its run-off (e.g. on the next court)
       if (Math.abs(x) > COURT.doublesHalf + 3 || y < -8 || y > COURT.length + 8) continue;
       if (!byFrame.has(f)) byFrame.set(f, []);
-      byFrame.get(f)!.push({ id, f, x, y, conf: c ?? 0 });
+      byFrame.get(f)!.push({ id, f, x, y, rx, ry, conf: c ?? 0 });
     }
   }
 
   // Assign SAM object ids to two players. Player A starts on the near side.
   const idToPlayer = new Map<string, 0 | 1>();
-  const spans = new Map<string, [number, number]>();
-  const last: (Sample | null)[] = [null, null];
+  // per player: SAM id -> first and last frame it was that player
+  // shortcut: an id that changes player twice gets one span per player covering both stints; split spans if that shows up
+  const spans = [new Map<string, [number, number]>(), new Map<string, [number, number]>()];
+  const last: (Det | null)[] = [null, null];
   const series: Sample[][] = [[], []];
   const take = (p: 0 | 1, d: Det) => {
     series[p].push({ f: d.f, x: d.x, y: d.y });
     last[p] = d;
-    spans.set(d.id, [spans.get(d.id)?.[0] ?? d.f, d.f]); // frames come in ascending order
+    spans[p].set(d.id, [spans[p].get(d.id)?.[0] ?? d.f, d.f]); // frames come in ascending order
   };
+  // SAM can trade the two players' ids after they cross in the image. A known id whose box is out of its player's reach
+  // but within the other player's is matched again like a new id. Raw box bottoms, so the far-side fix cannot blur a trade.
+  const reach = (p: 0 | 1, d: Det) => {
+    const l = last[p];
+    return !l || Math.hypot(d.rx - l.rx, d.ry - l.ry) <= JUMP + (MAX_SPEED * (d.f - l.f)) / tracks.fps;
+  };
+  const traded = (p: 0 | 1, d: Det) => !reach(p, d) && reach(p === 0 ? 1 : 0, d);
   for (const f of [...byFrame.keys()].sort((a, b) => a - b)) {
     const dets = byFrame.get(f)!.sort((a, b) => b.conf - a.conf);
     const used = new Set<number>();
     const unknown: Det[] = [];
     for (const d of dets) {
       const p = idToPlayer.get(d.id);
-      if (p === undefined) unknown.push(d);
+      if (p === undefined || traded(p, d)) unknown.push(d);
       else if (!used.has(p)) {
         used.add(p);
         take(p, d);
@@ -120,7 +137,7 @@ export function playerPositions(tracks: Tracks, imagePts: Pt[], method = V2): Pl
       return Math.abs(applyHomography(H, [u, v + 1])[1] - q.y);
     };
     const depthSigma = smoothed.map((seg) => seg.map((q) => SIGMA_PX[q.y > COURT.net ? "far" : "near"] * perPx(q)));
-    return { objectFrames: Object.fromEntries([...spans].filter(([id]) => idToPlayer.get(id) === i)), raw, smoothed, depthSigma };
+    return { objectFrames: Object.fromEntries(spans[i]), raw, smoothed, depthSigma };
   });
 }
 
@@ -241,11 +258,11 @@ function smooth(segs: Sample[][], half: number, farHalf: number): Sample[][] {
 // sometimes cuts it shorter, never lower, so the foot row is the lower envelope of the bottoms nearby (+-0.5 s).
 // V1 took the lowest bottom in the window, which also pulls a player moving in depth toward the camera; V2 takes a
 // line fitted to the window's bottoms (the motion) plus the given quantile of the bottoms' distance from it.
-function farBottom(boxes: Box[], i: number, half: number, m: Method): number {
+function farBottom(boxes: Box[], i: number, half: number, m: Method, keep: (j: number) => boolean): number {
   const f = boxes[i][0];
   const win: [number, number][] = [];
-  for (let j = i; j >= 0 && f - boxes[j][0] <= half; j--) win.push([boxes[j][0] - f, boxes[j][4]]);
-  for (let j = i + 1; j < boxes.length && boxes[j][0] - f <= half; j++) win.push([boxes[j][0] - f, boxes[j][4]]);
+  for (let j = i; j >= 0 && f - boxes[j][0] <= half; j--) if (keep(j)) win.push([boxes[j][0] - f, boxes[j][4]]);
+  for (let j = i + 1; j < boxes.length && boxes[j][0] - f <= half; j++) if (keep(j)) win.push([boxes[j][0] - f, boxes[j][4]]);
   if (m.farFix === "max") return Math.max(...win.map((w) => w[1]));
   // as wide on both sides, so the line is read at its middle and its slope cannot tip the estimate; right at a track's
   // ends there is no such window, so there the envelope is taken flat over the one-sided window

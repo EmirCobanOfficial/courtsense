@@ -91,6 +91,26 @@ test("analyze: only one player visible, id switch stays with that player", () =>
   assert.equal(B.coverage, 0);
 });
 
+test("playerPositions: two ids SAM trades after the players cross in the image stay with their players", () => {
+  const fps = 10;
+  const box = (f: number, w: Pt): Box => {
+    const [u, v] = applyHomography(toImage, w);
+    return [f, u - 20, v - 100, u + 20, v, 0.9];
+  };
+  const objects: Record<string, Box[]> = { p: [], q: [] };
+  for (let f = 0; f < 60; f++) {
+    const a: Pt = [-2 + (0.5 * f) / fps, 1], b: Pt = [1, 22]; // A walks along the near baseline, B stands far
+    // from frame 30 SAM follows A with id q and B with id p
+    objects.p.push(box(f, f < 30 ? a : b));
+    objects.q.push(box(f, f < 30 ? b : a));
+  }
+  const [A, B] = playerPositions({ fps, width: 1920, height: 1080, frames: 60, objects }, imagePts);
+  assert.ok(A.raw.flat().every((s) => s.y < 5), "A stays on the near side");
+  assert.ok(B.raw.flat().every((s) => s.y > 18), "B stays on the far side");
+  assert.deepEqual(A.objectFrames, { p: [0, 29], q: [30, 59] });
+  assert.deepEqual(B.objectFrames, { q: [0, 29], p: [30, 59] });
+});
+
 test("analyze: an id SAM later gives to someone on the next court keeps only its player frames", () => {
   const fps = 10;
   const boxes: Box[] = [];

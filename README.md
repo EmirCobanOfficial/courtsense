@@ -65,7 +65,7 @@ Details that matter for accuracy:
 - **Honest numbers.** A player's distance, speed and zone values are shown as rough (`~`) in two cases: their frame-to-frame depth jitter is above 0.3 m, or their expected depth error is above 0.6 m. The expected depth error comes from the hand-marked frames.
   - For a rough player, each zone share comes with a range: the time they were clearly in the zone, and the time they could have been.
   - The agent and the report say when a value is rough. Left / right stays reliable.
-- **Tracking hygiene.** People outside the court (benches, the next court) are filtered by position; SAM sometimes hands a player's id to someone else later, so each id only counts inside the frame span where it belonged to that player; boxes cut by a frame edge are dropped.
+- **Tracking hygiene.** People outside the court (benches, the next court) are filtered by position; SAM sometimes hands a player's id to someone else later, so each id only counts inside the frame span where it belonged to that player. If SAM trades the two players' ids after they cross in the image, an id whose box leaves its player's reach for the other player's is matched again (no trade happened in our session; a test covers it). Boxes cut by a frame edge are dropped.
 - **Cost.** SAM 3.1 video is $0.20 per 1,000 frames: a 12-minute session (10,688 frames) costs about $2.14. Results are cached on disk, so re-uploading the same file never pays twice.
 
 ## The coach assistant
@@ -91,6 +91,18 @@ Verification sits inside the `answer` tool, so the model cannot skip it (`lib/cl
   - with "about" / "yaklaşık" when the player is rough.
 
 A refused answer goes back to the model with the reasons. After three refusals the answer is shown as "Not verified". The report goes through the same check, with one rewrite. The route streams each step to the UI as NDJSON.
+
+## Agent evaluation
+
+| Test | What it checks | Result |
+|---|---|---|
+| Offline test set (`validate/coach-eval.ts`, scripted fake model, $0) | 23 answers sent through the app's real answer loop and tools on the coach's session: 8 correct answers that must be accepted, 8 wrong ones that must be refused, and 7 that try to game the check (a true claim under a false text, no claims, a time hidden in `at`, extra decimals, a rough Turkish value without "yaklaşık", a pronoun pointing at the wrong player) | 23/23 |
+| Live run (`validate/coach-live.ts`, Muse Spark 1.3, Oct 31, $0.198) | 8 real questions, including a false premise ("Player A ran 900 meters, right?") and one the data cannot answer ("How many forehands did Player A hit?"). Every answer is also audited offline | 8/8 verified, no audit flags |
+| Unit tests (`lib/claims.test.ts`, in CI) | claim matching, units, decimals, rough-value hedges, English and Turkish | pass |
+
+What the live runs show:
+- The false premise was corrected ("No. Player A ran 567 m in this session."), and the forehand question was declined, because there is no ball tracking.
+- The check catches the agent's own slips, and the agent fixes them. In the live run's pace question one draft was refused. In the demo video's voice question (2:13) two drafts were refused before the verified answer, and the step list shows both refusals.
 
 ## Accuracy, measured
 
