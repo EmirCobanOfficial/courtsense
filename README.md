@@ -19,6 +19,7 @@ Website: https://emircobanofficial.github.io/courtsense-site/
 | **SAM 3.1** (Meta Model API) | finds and tracks both players in every frame of a session, in one streamed video request |
 | **Muse Spark 1.3** (Meta Model API) | the coach assistant: picks its own tools, watches short clips of the session (video understanding), answers in English or Turkish; also writes the coach report |
 | **Muse Voice Transcribe** (Meta Model API) | the coach can ask the assistant by voice, in English or Turkish; the words land in the question box to check before asking |
+| **Muse Image** (Meta Model API) | draws the coach's goal for the next practice as a top-down drill card; the picture holds no numbers, the caption's come from the measurements |
 | `@meta-sam/parser` | reads SAM 3.1's streamed output (boxes and masks per frame) |
 | `@meta-sam/react`, `@meta-sam/graphics` | play the session in the browser with the SAM masks drawn on it |
 
@@ -42,6 +43,9 @@ A club coach films practice with one fixed camera behind the baseline. CourtSens
 - **Coach assistant**: a Muse Spark agent answers questions such as "Where did Player A run fastest?". It chooses its own tools, jumps the masked video to the moment it talks about, can watch a short clip (Muse Spark video understanding), and every number in its answer is checked against the data before the coach sees it.
 - **Ask by voice**: the coach can say the question instead of typing it. Muse Voice Transcribe turns it into text, with the language and tennis terms as hints, and the coach checks it before asking.
 - **Coach report** written by Muse Spark from the measured numbers only. Its numbers go through the same check, and the report shows whether they passed ("✓ Verified" / "Not verified").
+- **Practice card**: the coach writes a goal for the next practice, and Muse Image draws it as a drill on a top-down court, starting from where the player mostly stood. The prompt describes that in words, never in numbers, and asks for no text, so there is nothing in the picture to check; the numbers sit in the caption, straight from the metrics. $0.01 per card.
+
+  ![A practice card drawn by Muse Image for Player A, with the measured numbers in the caption](docs/practice-card.jpg)
 - English UI with a Turkish switch (the coach's language); the agent and the report answer in the selected language.
 
 ## How it works
@@ -132,6 +136,7 @@ Notes:
 | `lib/coach.ts` | the agent: tools, loop, session facts |
 | `lib/claims.ts` | the claim check for every number in answers and reports |
 | `lib/transcribe.ts` | Muse Voice Transcribe for spoken questions (the route converts the recording to WAV with ffmpeg) |
+| `lib/card.ts` | the practice card: the prompt from the player's measured pattern in words, and the Muse Image call |
 | `lib/model.ts`, `lib/fake-model.ts` | the Meta Model API client; a scripted local model for trying the UI without API calls |
 | `lib/report.ts` | Muse Spark coach report |
 | `lib/i18n.ts` | English / Turkish UI strings |

@@ -201,6 +201,7 @@ function JobView({ id, onStatus }: { id: string; onStatus: () => void }) {
       {metrics && <MetricsTable metrics={metrics} startSec={job.startSec} />}
       {metrics && <Heatmap metrics={metrics} />}
       {metrics && <Report id={id} report={report} onReport={setReport} />}
+      {metrics && <PracticeCard id={id} metrics={metrics} />}
     </section>
   );
 }
@@ -248,6 +249,65 @@ function Report({ id, report, onReport }: { id: string; report: ReportState | nu
             ) : null,
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+const ZONE_KEY = { behindBaseline: "z_behind", baseline: "z_baseline", midCourt: "z_mid", net: "z_net" } as const;
+const SIDE_KEY = { left: "s_left", center: "s_center", right: "s_right" } as const;
+const most = <K extends string>(shares: Record<K, number>) => (Object.entries(shares) as [K, number][]).sort((a, b) => b[1] - a[1])[0];
+
+// Muse Image draws the coach's goal as a drill. The picture holds no numbers; the caption's come from the metrics.
+function PracticeCard({ id, metrics }: { id: string; metrics: PlayerMetrics[] }) {
+  const { t, pct } = useT();
+  const [p, setP] = useState<0 | 1>(0);
+  const [goal, setGoal] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [card, setCard] = useState<{ image: string; goal: string; m: PlayerMetrics } | null>(null);
+  async function draw(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr("");
+    const res = await fetch(`/api/jobs/${id}/card`, { method: "POST", body: JSON.stringify({ player: p ? "B" : "A", goal }) });
+    const d = await res.json();
+    setBusy(false);
+    if (!res.ok) return setErr(d.error);
+    setCard({ image: d.image, goal: goal.trim(), m: metrics[p] });
+  }
+  const facts = (m: PlayerMetrics) => {
+    const [zone, zoneShare] = most(m.zones), [side, sideShare] = most(m.lateral);
+    const where = `${m.reliable ? `${pct(zoneShare)} ${t(ZONE_KEY[zone])}, ` : ""}${pct(sideShare)} ${t(SIDE_KEY[side])}`;
+    return `${t("player", { p: m.player })} · ${t("cardLast")}: ${where}${m.reliable ? "" : ` (${t("cardRough")})`}`;
+  };
+  return (
+    <div className="space-y-3">
+      <h3 className="font-medium">
+        {t("card")} <span className="text-sm font-normal opacity-60">· {t("cardSub")}</span>
+      </h3>
+      <form onSubmit={draw} className="flex flex-wrap gap-2">
+        <select value={p} onChange={(e) => setP(e.target.value === "1" ? 1 : 0)} aria-label={t("cardPlayerAria")} className="rounded border border-black/20 bg-transparent px-2 py-1 text-sm dark:border-white/25">
+          <option value="0">{t("player", { p: "A" })}</option>
+          <option value="1">{t("player", { p: "B" })}</option>
+        </select>
+        <input value={goal} onChange={(e) => setGoal(e.target.value)} maxLength={200} placeholder={t("cardGoal")} aria-label={t("cardGoalAria")}
+          className="min-w-0 flex-1 rounded border border-black/20 bg-transparent px-2 py-1 text-sm dark:border-white/25" />
+        <button disabled={busy || !goal.trim()} className="rounded bg-foreground px-3 py-1 text-sm text-background disabled:opacity-50">
+          {busy ? t("cardBusy") : t("cardDraw")}
+        </button>
+      </form>
+      {err && <p className="text-sm text-red-600">{err}</p>}
+      {card && (
+        <figure className="max-w-2xl space-y-2">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a data URL from Muse Image, nothing to optimize */}
+          <img src={card.image} alt={t("cardAlt", { goal: card.goal })} className="w-full rounded-lg border border-black/10 dark:border-white/15" />
+          <figcaption className="space-y-1 text-sm">
+            <p>{facts(card.m)}</p>
+            <p>{card.goal}</p>
+            <p className="opacity-60">{t("cardNote")}</p>
+          </figcaption>
+        </figure>
       )}
     </div>
   );

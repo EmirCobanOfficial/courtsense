@@ -62,3 +62,8 @@ export function fakeModel(bad: boolean): Pick<OpenAI, "responses"> {
   };
   return { responses: { create } } as unknown as Pick<OpenAI, "responses">;
 }
+
+// Muse Image stand-in for the practice card: a plain top-down court with one arrow, no text
+const COURT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400"><rect width="600" height="400" fill="#2a5caa"/><g fill="none" stroke="#fff" stroke-width="3"><rect x="60" y="80" width="480" height="240"/><path d="M300 80V320M60 120H540M60 280H540M180 120V280M420 120V280M180 200H420"/></g><path d="M110 200H250" stroke="#f0913a" stroke-width="8" marker-end="url(#a)"/><defs><marker id="a" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#f0913a"/></marker></defs></svg>`;
+export const fakeImages = () =>
+  ({ images: { generate: async () => ({ data: [{ b64_json: Buffer.from(COURT_SVG).toString("base64") }] }) } }) as unknown as Pick<OpenAI, "images">;
