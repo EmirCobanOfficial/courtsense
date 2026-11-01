@@ -16,7 +16,7 @@ Website: https://emircobanofficial.github.io/courtsense-site/
 
 | Meta model or package | What it does here |
 |---|---|
-| **SAM 3.1** (Meta Model API) | finds and tracks both players in every frame of a session, in one streamed video request |
+| **SAM 3.1** (Meta Model API) | finds both players and tracks them frame by frame through a session, in one streamed video request |
 | **Muse Spark 1.3** (Meta Model API) | the coach assistant: picks its own tools, watches short clips of the session (video understanding), answers in English or Turkish; also writes the coach report |
 | **Muse Voice Transcribe** (Meta Model API) | the coach can ask the assistant by voice, in English or Turkish; the words land in the question box to check before asking |
 | **Muse Image** (Meta Model API) | draws the coach's goal for the next practice as a top-down drill card; the picture holds no numbers, the caption's come from the measurements |
@@ -36,7 +36,7 @@ The hackathon lists sports analyzers among the projects to avoid, because so man
 A club coach films practice with one fixed camera behind the baseline. CourtSense turns that footage into numbers:
 
 - **Upload** the session and pick the part to analyze (start / end time).
-- **SAM 3.1** (Meta Model API, video segmentation) finds and tracks both players through every frame.
+- **SAM 3.1** (Meta Model API, video segmentation) finds both players and tracks them frame by frame.
 - **Four clicks** on court-line intersections calibrate the camera; every foot position becomes a point on the court, in meters.
 - **Metrics** per player: distance, average and peak speed, time behind the baseline / at the baseline / mid-court / at the net, left / center / right split, side changes, and a measurement-confidence score.
 - **Heatmap** (bird's-eye) and the **SAM masks drawn on the video**, rendered in the browser with Meta's `@meta-sam/react` and `@meta-sam/graphics`.
