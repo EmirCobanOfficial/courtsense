@@ -6,9 +6,9 @@ Movement data from a tennis coach's training video, built on Meta **SAM 3.1** an
 
 > Built during the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026) for the problem statement **Build for Your World**. Nothing in this repository existed before the hackathon; the commit history shows the build. Pre-existing: our coach's training video, Meta's models and packages, and open-source libraries.
 
-[![CourtSense demo video (3 min)](https://img.youtube.com/vi/mXLhQJ-pKrA/hqdefault.jpg)](https://youtu.be/mXLhQJ-pKrA)
+[![CourtSense demo video (3 min)](https://img.youtube.com/vi/aLUSjad3vto/hqdefault.jpg)](https://youtu.be/aLUSjad3vto)
 
-Demo video (3 min): https://youtu.be/mXLhQJ-pKrA
+Demo video (3 min): https://youtu.be/aLUSjad3vto
 
 Website: https://emircobanofficial.github.io/courtsense-site/
 
@@ -123,7 +123,7 @@ After submission we measured positions against feet marked by hand on our coach'
 
 Notes:
 - Player A's error is mostly a difference in definition: the app's foot point is the bottom of the box (the front foot), the hand mark is between the feet.
-- The demo video was re-recorded on Nov 1 with the current version. The video submitted on Oct 28 is at https://youtu.be/C0gcC3CdusI; there Player B's distance reads 752 m, now about 650 m. Player A's numbers did not change.
+- The demo video was last updated on Nov 2 with the current version. The video submitted on Oct 28 is at https://youtu.be/C0gcC3CdusI; there Player B's distance reads 752 m, now about 650 m. Player A's numbers did not change.
 - Details and limits are in [validate/README.md](validate/README.md).
 
 ## Code map
