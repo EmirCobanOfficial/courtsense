@@ -70,7 +70,7 @@ Details that matter for accuracy:
   - For a rough player, each zone share comes with a range: the time they were clearly in the zone, and the time they could have been.
   - The agent and the report say when a value is rough. Left / right stays reliable.
 - **Tracking hygiene.** People outside the court (benches, the next court) are filtered by position; SAM sometimes hands a player's id to someone else later, so each id only counts inside the frame span where it belonged to that player. If SAM trades the two players' ids after they cross in the image, an id whose box leaves its player's reach for the other player's is matched again (no trade happened in our session; a test covers it). Boxes cut by a frame edge are dropped.
-- **Cost.** SAM 3.1 video is $0.20 per 1,000 frames: a 12-minute session at 15 fps (10,688 frames) costs about $2.14. Only the chosen part of the video is sent, and results are cached on disk, so re-uploading the same file never pays twice. A real run at 7.5 fps cost half; see "Fewer frames" below.
+- **Cost.** SAM 3.1 video is $0.20 per 1,000 frames: a 12-minute session at 15 fps (10,688 frames) costs about $2.14. Only the chosen part of the video is sent, and results are cached on disk, so re-uploading the same file never pays twice. Economy mode (7.5 fps) costs half; see "Fewer frames" below.
 
 ## The coach assistant
 
@@ -141,7 +141,7 @@ SAM bills per frame, so we sent the same session to SAM 3.1 again at 7.5 fps: ev
 | Player B (rough): distance, peak speed | ~650 m, ~3.07 m/s | ~624 m (−4.0%), ~2.93 m/s (−4.6%) |
 | Time behind the baseline, A / B | 67% / ~72% | 67% / ~73% |
 
-At the same instants Player A's positions agree to 0.03 m and Player B's to 0.8 m (far-side depth). With half the samples, the measured path cuts a few more corners, so distance and peak speed read a little lower, most for the far player. 15 fps stays the default. A job can be set to 7.5 fps (`Job.fps`), but the upload screen does not offer it yet.
+At the same instants Player A's positions agree to 0.03 m and Player B's to 0.8 m (far-side depth). With half the samples, the measured path cuts a few more corners, so distance and peak speed read a little lower, most for the far player. The upload screen offers this as **Economy (7.5 fps)**, with **Standard (15 fps)** as the default, and shows the estimated SAM 3.1 cost before anything is sent (`lib/cost.ts`). Each mode keeps its own cached results, so a video analyzed in one mode never pays again in that mode.
 
 ## Code map
 
@@ -154,6 +154,7 @@ At the same instants Player A's positions agree to 0.03 m and Player B's to 0.8 
 | `lib/claims.ts` | the claim check for every number in answers and reports |
 | `lib/transcribe.ts` | Muse Voice Transcribe for spoken questions (the route converts the recording to WAV with ffmpeg) |
 | `lib/card.ts` | the practice card: the prompt from the player's measured pattern in words, and the Muse Image call |
+| `lib/cost.ts` | SAM 3.1 pricing and the two modes, Standard (15 fps) and Economy (7.5 fps): the upload screen's estimate and the frame rate a job runs at |
 | `lib/model.ts`, `lib/fake-model.ts` | the Meta Model API client; a scripted local model for trying the UI without API calls |
 | `lib/report.ts` | Muse Spark coach report |
 | `lib/i18n.ts` | English / Turkish UI strings |

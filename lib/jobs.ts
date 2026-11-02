@@ -8,11 +8,10 @@ import { frameIndexOf, parseVideoStream, recordsOfKind } from "@meta-sam/parser"
 import type { Box, Tracks } from "./metrics.ts";
 import type { Pt } from "./court.ts";
 import { fakeMode } from "./model.ts";
+import { MAX_FRAMES, STANDARD_FPS } from "./cost.ts";
 
 export const DATA = path.join(process.cwd(), "data");
-const FPS = 15; // enough for footwork; also keeps the per-frame SAM bill low (a job can ask for fewer, see Job.fps)
 const WIDTH = 1920; // the far player is ~40 px tall at 1080p, still detected
-const MAX_FRAMES = 15000; // SAM 3.1 limit per request
 const PROMPT = "tennis player";
 
 export type Job = {
@@ -31,16 +30,17 @@ export type Job = {
   height?: number;
   truncated?: boolean;
   calibration?: Pt[];
-  fps?: number; // frames per second sent to SAM; FPS when unset. SAM bills per frame.
+  fps?: number; // frames per second sent to SAM: 15 (Standard) when unset, or 7.5 (Economy). SAM bills per frame.
 };
 
 export const isJobId = (id: string) => /^[a-f0-9]{12}$/.test(id);
 export const jobDir = (id: string) => path.join(DATA, id);
 export const jobFile = (id: string, f: string) => path.join(jobDir(id), f);
 
-// Same file + same start time gives the same id, so a re-upload reuses paid SAM results.
-export const jobIdFor = (name: string, size: number, startSec: number) =>
-  crypto.createHash("sha1").update(`${name}|${size}|${startSec}`).digest("hex").slice(0, 12);
+// Same file + same start time + same frame rate gives the same id, so a re-upload reuses paid SAM results and the two
+// modes never share them. A Standard job keeps the id it had before the frame rate was a choice.
+export const jobIdFor = (name: string, size: number, startSec: number, fps = STANDARD_FPS) =>
+  crypto.createHash("sha1").update(`${name}|${size}|${startSec}${fps === STANDARD_FPS ? "" : `|${fps}fps`}`).digest("hex").slice(0, 12);
 
 export function readJob(id: string): Job | null {
   try {
@@ -90,7 +90,7 @@ export async function processJob(id: string) {
   const update = (patch: Partial<Job>) => writeJob({ ...readJob(id)!, ...patch });
   try {
     const job = readJob(id)!;
-    const fps = job.fps ?? FPS;
+    const fps = job.fps ?? STANDARD_FPS; // 15 fps is enough for footwork and keeps the per-frame SAM bill low
     const clip = jobFile(id, "clip.mp4");
     if (!fs.existsSync(clip)) {
       update({ status: "preprocessing", progress: 0, error: undefined });

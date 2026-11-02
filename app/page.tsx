@@ -8,6 +8,7 @@ import { applyHomography, CALIBRATION_POINTS, COURT_LINES, solveHomography, type
 import { LangContext, useT, type Key, type Lang } from "@/lib/i18n.ts";
 import type { Job } from "@/lib/jobs.ts";
 import type { PlayerMetrics } from "@/lib/metrics.ts";
+import { ECONOMY_FPS, samCost, STANDARD_FPS } from "@/lib/cost.ts";
 
 // The saved language; the server render (and a blocked localStorage) gets English.
 const savedLang = (): Lang => {
@@ -80,7 +81,7 @@ function JobList({ jobs, selected, onSelect }: { jobs: Job[]; selected: string |
               onClick={() => onSelect(j.id)}
               className={`rounded border px-3 py-1 text-sm ${selected === j.id ? "border-current" : "border-black/15 dark:border-white/20"}`}
             >
-              {j.name} · {range(j, t("rangeEnd"))} · {t(`status_${j.status}`)}
+              {j.name} · {range(j, t("rangeEnd"))}{j.fps === ECONOMY_FPS ? ` · ${t("economyTag")}` : ""} · {t(`status_${j.status}`)}
             </button>
           </li>
         ))}
@@ -90,19 +91,36 @@ function JobList({ jobs, selected, onSelect }: { jobs: Job[]; selected: string |
 }
 
 function Upload({ onCreated }: { onCreated: (id: string) => void }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [file, setFile] = useState<File | null>(null);
+  const [duration, setDuration] = useState<number | null>(null);
+  const [fps, setFps] = useState(STANDARD_FPS);
   const [start, setStart] = useState("3:10");
   const [end, setEnd] = useState("");
   const [pct, setPct] = useState<number | null>(null);
   const [err, setErr] = useState("");
 
+  // the video's length, read in the browser, for the cost estimate (unknown if the browser cannot open the file)
+  function pick(f: File | null) {
+    setFile(f);
+    setDuration(null);
+    if (!f) return;
+    const v = document.createElement("video");
+    const url = URL.createObjectURL(f);
+    v.preload = "metadata";
+    v.onloadedmetadata = () => (setDuration(Number.isFinite(v.duration) ? v.duration : null), URL.revokeObjectURL(url));
+    v.onerror = () => URL.revokeObjectURL(url);
+    v.src = url;
+  }
+  const startSec = parseTime(start), endSec = end.trim() ? parseTime(end) : undefined;
+  const seconds = startSec === null || endSec === null ? NaN : Math.min(endSec ?? Infinity, duration ?? Infinity) - startSec;
+  const est = Number.isFinite(seconds) && seconds > 0 ? samCost(seconds, fps) : null;
+  const usd = (v: number) => `$${v.toFixed(2)}`;
+
   async function submit() {
-    const startSec = parseTime(start);
-    const endSec = end.trim() ? parseTime(end) : undefined;
     if (!file || startSec === null || endSec === null) return setErr(t("badInput"));
     setErr("");
-    const res = await fetch("/api/jobs", { method: "POST", body: JSON.stringify({ name: file.name, size: file.size, startSec, endSec }) });
+    const res = await fetch("/api/jobs", { method: "POST", body: JSON.stringify({ name: file.name, size: file.size, startSec, endSec, fps }) });
     const { job, needsUpload, error } = await res.json();
     if (!res.ok) return setErr(error);
     if (needsUpload) {
@@ -126,7 +144,7 @@ function Upload({ onCreated }: { onCreated: (id: string) => void }) {
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
           {t("video")}
-          <input type="file" accept="video/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block text-sm" />
+          <input type="file" accept="video/*" onChange={(e) => pick(e.target.files?.[0] ?? null)} className="block text-sm" />
         </label>
         <label className="text-sm">
           {t("start")}
@@ -140,6 +158,21 @@ function Upload({ onCreated }: { onCreated: (id: string) => void }) {
           {t("upload")}
         </button>
       </div>
+      <fieldset className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+        <legend className="mb-1">{t("mode")}</legend>
+        {([[STANDARD_FPS, "modeStandard"], [ECONOMY_FPS, "modeEconomy"]] as const).map(([f, k]) => (
+          <label key={f} className="flex items-center gap-2">
+            <input type="radio" name="mode" checked={fps === f} onChange={() => setFps(f)} />
+            {t(k)}
+          </label>
+        ))}
+      </fieldset>
+      <p className="text-sm">
+        {est
+          ? t("costEstimate", { usd: usd(est.usd), frames: est.frames.toLocaleString(lang), fps: fps.toLocaleString(lang) })
+          : t("costPerMinute", { usd: usd(samCost(60, fps).usd), fps: fps.toLocaleString(lang) })}
+      </p>
+      {fps === ECONOMY_FPS && <p className="text-xs opacity-70">{t("economyNote")}</p>}
       {pct !== null && <Bar value={pct} label={t("uploading", { p: Math.round(pct * 100) })} />}
       {err && <p className="text-sm text-red-600">{err}</p>}
     </section>
@@ -182,7 +215,7 @@ function JobView({ id, onStatus }: { id: string; onStatus: () => void }) {
     <section className="space-y-6">
       <div className="space-y-2">
         <h2 className="font-medium">
-          {job.name} <span className="opacity-60">· {range(job, t("rangeEnd"))}</span>
+          {job.name} <span className="opacity-60">· {range(job, t("rangeEnd"))}{job.fps === ECONOMY_FPS ? ` · ${t("economyTag")}` : ""}</span>
         </h2>
         {job.status !== "ready" && job.status !== "error" && <Bar value={job.progress} label={`${t(`status_${job.status}`)} ${pct(job.progress)}`} />}
         {job.status === "error" && (
@@ -199,6 +232,7 @@ function JobView({ id, onStatus }: { id: string; onStatus: () => void }) {
       {metrics && <MaskVideo job={job} metrics={metrics} jumpTo={jump} />}
       {metrics && <CoachChat job={job} onSeek={(sourceSec) => setJump((j) => ({ sourceSec, n: (j?.n ?? 0) + 1 }))} />}
       {metrics && <MetricsTable metrics={metrics} startSec={job.startSec} />}
+      {metrics && job.fps === ECONOMY_FPS && <p className="-mt-4 text-xs opacity-60">{t("economyNote")}</p>}
       {metrics && <Heatmap metrics={metrics} />}
       {metrics && <Report id={id} report={report} onReport={setReport} />}
       {metrics && <PracticeCard id={id} metrics={metrics} />}

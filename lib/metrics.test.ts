@@ -91,6 +91,24 @@ test("analyze: only one player visible, id switch stays with that player", () =>
   assert.equal(B.coverage, 0);
 });
 
+test("analyze: the same walk at Standard (15 fps) and Economy (7.5 fps) gives the same distance and speed", () => {
+  const walk = (fps: number): Tracks => {
+    const boxes: Box[] = [];
+    for (let f = 0; f < 20 * fps; f++) {
+      const [u, v] = applyHomography(toImage, [-4 + (0.5 * f) / fps, 1]); // 0.5 m/s along the baseline for 20 s: 10 m
+      boxes.push([f, u - 20, v - 100, u + 20, v, 0.9]);
+    }
+    return { fps, width: 1920, height: 1080, frames: 20 * fps, objects: { a: boxes } };
+  };
+  for (const fps of [15, 7.5]) {
+    const [A] = analyze(walk(fps), imagePts);
+    assert.ok(Math.abs(A.distanceM - 10) < 0.3, `${fps} fps distance ${A.distanceM}`);
+    assert.ok(Math.abs(A.avgSpeed - 0.5) < 0.03, `${fps} fps speed ${A.avgSpeed}`);
+    assert.ok(Math.abs(A.seconds - 20) < 0.2, `${fps} fps seconds ${A.seconds}`);
+    assert.equal(A.coverage, 1);
+  }
+});
+
 test("playerPositions: two ids SAM trades after the players cross in the image stay with their players", () => {
   const fps = 10;
   const box = (f: number, w: Pt): Box => {
