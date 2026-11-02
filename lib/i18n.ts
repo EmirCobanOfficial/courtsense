@@ -239,10 +239,15 @@ const tr: typeof en = {
 export type Key = keyof typeof en;
 const STRINGS: Record<Lang, typeof en> = { en, tr };
 
+// A dollar amount in the UI language: $2.14 in English, $2,14 in Turkish (the decimal comma, the dollar sign kept)
+export const formatUsd = (v: number, lang: Lang, digits = 2) =>
+  v.toLocaleString(lang, { style: "currency", currency: "USD", minimumFractionDigits: digits, maximumFractionDigits: digits });
+
 export function useT() {
   const lang = useContext(LangContext);
   const t = (k: Key, vars: Record<string, string | number> = {}) => STRINGS[lang][k].replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? ""));
   // Turkish writes the percent sign first
   const pct = (v: number) => (lang === "tr" ? `%${Math.round(v * 100)}` : `${Math.round(v * 100)}%`);
-  return { t, pct, lang };
+  const usd = (v: number, digits = 2) => formatUsd(v, lang, digits);
+  return { t, pct, usd, lang };
 }

@@ -91,7 +91,7 @@ function JobList({ jobs, selected, onSelect }: { jobs: Job[]; selected: string |
 }
 
 function Upload({ onCreated }: { onCreated: (id: string) => void }) {
-  const { t, lang } = useT();
+  const { t, usd, lang } = useT();
   const [file, setFile] = useState<File | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const [fps, setFps] = useState(STANDARD_FPS);
@@ -115,7 +115,6 @@ function Upload({ onCreated }: { onCreated: (id: string) => void }) {
   const startSec = parseTime(start), endSec = end.trim() ? parseTime(end) : undefined;
   const seconds = startSec === null || endSec === null ? NaN : Math.min(endSec ?? Infinity, duration ?? Infinity) - startSec;
   const est = Number.isFinite(seconds) && seconds > 0 ? samCost(seconds, fps) : null;
-  const usd = (v: number) => `$${v.toFixed(2)}`;
 
   async function submit() {
     if (!file || startSec === null || endSec === null) return setErr(t("badInput"));

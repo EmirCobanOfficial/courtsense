@@ -9,7 +9,7 @@ type Turn = { question: string; events: CoachEvent[]; answer?: string; verified?
 
 // Koç asistanı: the coach asks, the Muse Spark agent works with tools (shown live) and jumps the video to what it talks about.
 export function CoachChat({ job, onSeek }: { job: Job; onSeek: (sourceSec: number) => void }) {
-  const { t: tx, lang } = useT();
+  const { t: tx, usd, lang } = useT();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
@@ -131,7 +131,7 @@ export function CoachChat({ job, onSeek }: { job: Job; onSeek: (sourceSec: numbe
                 <span className={t.verified ? "text-green-700 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}>
                   {t.verified ? tx("verified") : tx("unverified")}
                 </span>
-                {t.cost !== undefined && ` · ${tx("steps", { n: t.turns ?? 0 })} · ~$${t.cost.toFixed(3)}`}
+                {t.cost !== undefined && ` · ${tx("steps", { n: t.turns ?? 0 })} · ~${usd(t.cost, 3)}`}
               </p>
             </div>
           )}

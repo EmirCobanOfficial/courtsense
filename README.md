@@ -51,7 +51,7 @@ A club coach films practice with one fixed camera behind the baseline. CourtSens
 ## How it works
 
 ```
-video ──ffmpeg (1080p, 15 fps)──▶ SAM 3.1 "tennis player" ──▶ tracks.json (boxes per object id per frame)
+video ──ffmpeg (1080p; 15 fps Standard, 7.5 fps Economy)──▶ SAM 3.1 "tennis player" ──▶ tracks.json (boxes per object id per frame)
                                                                    │
             4 calibration clicks ──▶ homography (image px → court m)
                                                                    ▼
@@ -106,7 +106,7 @@ A refused answer goes back to the model with the reasons. After three refusals t
 
 What the live runs show:
 - The false premise was corrected ("No. Player A ran 567 m in this session."), and the forehand question was declined, because there is no ball tracking.
-- The check catches the agent's own slips, and the agent fixes them. In the live run's pace question one draft was refused. In the demo video's voice question (2:13) two drafts were refused before the verified answer, and the step list shows both refusals.
+- The check catches the agent's own slips, and the agent fixes them. In the live run's pace question one draft was refused. In the demo video's voice question (2:09) two drafts were refused before the verified answer, and the step list shows both refusals.
 
 ## Accuracy, measured
 
@@ -123,7 +123,7 @@ After submission we measured positions against feet marked by hand on our coach'
 
 Notes:
 - Player A's error is mostly a difference in definition: the app's foot point is the bottom of the box (the front foot), the hand mark is between the feet.
-- The demo video was last updated on Nov 2 with the current version. The video submitted on Oct 28 is at https://youtu.be/C0gcC3CdusI; there Player B's distance reads 752 m, now about 650 m. Player A's numbers did not change.
+- The demo video was last updated on Nov 2, before Economy mode was added: its upload screen has no mode choice, and everything it shows is Standard (15 fps), still the default. The video submitted on Oct 28 is at https://youtu.be/C0gcC3CdusI; there Player B's distance reads 752 m, now about 650 m. Player A's numbers did not change.
 - Details and limits are in [validate/README.md](validate/README.md).
 
 ### Fewer frames: a real 7.5 fps run
@@ -194,7 +194,7 @@ With `=bad` instead, every answer has a wrong number, so it shows as not verifie
 - With a low camera the far player's depth is rough: about 1 m of error on the hand-marked frames. The app marks it and gives ranges rather than guessing.
 - The error figures come from one session and one camera position. A different setup needs its own hand-marked frames.
 - Slow camera drift (gimbal pan) is not compensated yet.
-- One SAM request covers up to 15,000 frames (about 16 minutes at 15 fps).
+- One SAM request covers up to 15,000 frames: about 16.7 minutes of video in Standard (15 fps) and 33.3 minutes in Economy (7.5 fps).
 
 ## Privacy
 
