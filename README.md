@@ -70,7 +70,7 @@ Details that matter for accuracy:
   - For a rough player, each zone share comes with a range: the time they were clearly in the zone, and the time they could have been.
   - The agent and the report say when a value is rough. Left / right stays reliable.
 - **Tracking hygiene.** People outside the court (benches, the next court) are filtered by position; SAM sometimes hands a player's id to someone else later, so each id only counts inside the frame span where it belonged to that player. If SAM trades the two players' ids after they cross in the image, an id whose box leaves its player's reach for the other player's is matched again (no trade happened in our session; a test covers it). Boxes cut by a frame edge are dropped.
-- **Cost.** SAM 3.1 video is $0.20 per 1,000 frames: a 12-minute session (10,688 frames) costs about $2.14. Results are cached on disk, so re-uploading the same file never pays twice.
+- **Cost.** SAM 3.1 video is $0.20 per 1,000 frames: a 12-minute session at 15 fps (10,688 frames) costs about $2.14. Only the chosen part of the video is sent, and results are cached on disk, so re-uploading the same file never pays twice. A real run at 7.5 fps cost half; see "Fewer frames" below.
 
 ## The coach assistant
 
@@ -125,6 +125,23 @@ Notes:
 - Player A's error is mostly a difference in definition: the app's foot point is the bottom of the box (the front foot), the hand mark is between the feet.
 - The demo video was last updated on Nov 2 with the current version. The video submitted on Oct 28 is at https://youtu.be/C0gcC3CdusI; there Player B's distance reads 752 m, now about 650 m. Player A's numbers did not change.
 - Details and limits are in [validate/README.md](validate/README.md).
+
+### Fewer frames: a real 7.5 fps run
+
+SAM bills per frame, so we sent the same session to SAM 3.1 again at 7.5 fps: every second frame of the 15 fps clip (`validate/fps-test.ts`). Frame k of that run is frame 2k of the baseline, so both compare at the same instants.
+
+| | 15 fps (default) | 7.5 fps |
+|---|---|---|
+| Frames sent to SAM, cost | 10,688, $2.14 | 5,344, $1.07 |
+| Identity swaps (an id crossing the net or moving to the other player) | 0 | 0 |
+| SAM ids per player, A / B (SAM lost the player and gave a new id) | 3 / 4 | 5 / 2 |
+| Frames with the player tracked, A / B | 92.1% / 99.0% | 92.0% / 99.2% |
+| Position error on hand-marked frames, A / B (the even ones: 35 / 26) | 0.40 m / 1.05 m | 0.40 m / 1.05 m |
+| Player A: distance, peak speed | 567 m, 2.01 m/s | 561 m (−1.1%), 2.00 m/s |
+| Player B (rough): distance, peak speed | ~650 m, ~3.07 m/s | ~624 m (−4.0%), ~2.93 m/s (−4.6%) |
+| Time behind the baseline, A / B | 67% / ~72% | 67% / ~73% |
+
+At the same instants Player A's positions agree to 0.03 m and Player B's to 0.8 m (far-side depth). With half the samples, the measured path cuts a few more corners, so distance and peak speed read a little lower, most for the far player. 15 fps stays the default. A job can be set to 7.5 fps (`Job.fps`), but the upload screen does not offer it yet.
 
 ## Code map
 

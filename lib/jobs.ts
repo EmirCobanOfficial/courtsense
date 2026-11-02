@@ -10,7 +10,7 @@ import type { Pt } from "./court.ts";
 import { fakeMode } from "./model.ts";
 
 export const DATA = path.join(process.cwd(), "data");
-const FPS = 15; // enough for footwork; also keeps the per-frame SAM bill low
+const FPS = 15; // enough for footwork; also keeps the per-frame SAM bill low (a job can ask for fewer, see Job.fps)
 const WIDTH = 1920; // the far player is ~40 px tall at 1080p, still detected
 const MAX_FRAMES = 15000; // SAM 3.1 limit per request
 const PROMPT = "tennis player";
@@ -31,6 +31,7 @@ export type Job = {
   height?: number;
   truncated?: boolean;
   calibration?: Pt[];
+  fps?: number; // frames per second sent to SAM; FPS when unset. SAM bills per frame.
 };
 
 export const isJobId = (id: string) => /^[a-f0-9]{12}$/.test(id);
@@ -89,10 +90,11 @@ export async function processJob(id: string) {
   const update = (patch: Partial<Job>) => writeJob({ ...readJob(id)!, ...patch });
   try {
     const job = readJob(id)!;
+    const fps = job.fps ?? FPS;
     const clip = jobFile(id, "clip.mp4");
     if (!fs.existsSync(clip)) {
       update({ status: "preprocessing", progress: 0, error: undefined });
-      await preprocess(jobFile(id, "source"), clip, job.startSec, job.endSec, (p) => update({ progress: p }));
+      await preprocess(jobFile(id, "source"), clip, job.startSec, job.endSec, fps, (p) => update({ progress: p }));
       await run("ffmpeg", ["-v", "error", "-y", "-i", clip, "-frames:v", "1", jobFile(id, "frame.jpg")]);
       fs.rmSync(jobFile(id, "source"), { force: true }); // the 4K original is no longer needed
     }
@@ -100,7 +102,7 @@ export async function processJob(id: string) {
     update({ ...info, truncated: info.frames >= MAX_FRAMES });
     if (!fs.existsSync(jobFile(id, "tracks.json"))) {
       update({ status: "segmenting", progress: 0, error: undefined });
-      await segment(id, clip, info, (p) => update({ progress: p }));
+      await segment(id, clip, info, fps, (p) => update({ progress: p }));
     }
     update({ status: "ready", progress: 1, error: undefined });
   } catch (e) {
@@ -110,10 +112,10 @@ export async function processJob(id: string) {
   }
 }
 
-async function preprocess(src: string, out: string, startSec: number, endSec: number | undefined, onProgress: (p: number) => void) {
+async function preprocess(src: string, out: string, startSec: number, endSec: number | undefined, fps: number, onProgress: (p: number) => void) {
   const { duration } = await probe(src, false);
   // shortcut: one SAM request caps at 15,000 frames (~16 min at 15 fps); chunk the clip to support full matches.
-  const total = Math.min(Math.min(endSec ?? duration, duration) - startSec, MAX_FRAMES / FPS);
+  const total = Math.min(Math.min(endSec ?? duration, duration) - startSec, MAX_FRAMES / fps);
   if (total <= 0) throw new Error(`start ${startSec}s is past the end of the video (${duration.toFixed(0)}s)`);
   let last = 0;
   await run(
@@ -121,7 +123,7 @@ async function preprocess(src: string, out: string, startSec: number, endSec: nu
     [
       "-v", "error", "-y", "-hwaccel", "auto", "-ss", String(startSec), "-i", src,
       "-t", String(total), "-map", "0:v:0", "-an",
-      "-vf", `scale=${WIDTH}:-2,fps=${FPS}`, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+      "-vf", `scale=${WIDTH}:-2,fps=${fps}`, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
       "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", out,
     ],
     (line) => {
@@ -134,7 +136,7 @@ async function preprocess(src: string, out: string, startSec: number, endSec: nu
   );
 }
 
-async function segment(id: string, clip: string, info: { frames: number; width: number; height: number }, onProgress: (p: number) => void) {
+async function segment(id: string, clip: string, info: { frames: number; width: number; height: number }, fps: number, onProgress: (p: number) => void) {
   if (fakeMode()) throw new Error("COURTSENSE_FAKE_MODEL is set: SAM calls are disabled");
   if (!process.env.MODEL_API_KEY) throw new Error("MODEL_API_KEY is not set in .env.local");
   const client = new OpenAI({ baseURL: "https://api.meta.ai/v1", apiKey: process.env.MODEL_API_KEY });
@@ -188,7 +190,7 @@ async function segment(id: string, clip: string, info: { frames: number; width: 
   for (const b of recordsOfKind(result.records, "box")) {
     (objects[b.objectId] ??= []).push([frameIndexOf(b) ?? -1, b.left, b.top, b.right, b.bottom, b.confidence ?? null]);
   }
-  const tracks: Tracks = { fps: FPS, ...info, objects };
+  const tracks: Tracks = { fps, ...info, objects };
   fs.writeFileSync(jobFile(id, "tracks.json"), JSON.stringify(tracks));
 }
 
