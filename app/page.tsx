@@ -90,6 +90,10 @@ function JobList({ jobs, selected, onSelect }: { jobs: Job[]; selected: string |
   );
 }
 
+// Economy (7.5 fps) stays in the code and the API but is not offered here: in one of two real runs SAM lost the far
+// player for the last 2 minutes (README, "Fewer frames"). Add [ECONOMY_FPS, "modeEconomy"] to offer it again.
+const UPLOAD_MODES = [[STANDARD_FPS, "modeStandard"]] as const;
+
 function Upload({ onCreated }: { onCreated: (id: string) => void }) {
   const { t, usd, lang } = useT();
   const [file, setFile] = useState<File | null>(null);
@@ -159,7 +163,7 @@ function Upload({ onCreated }: { onCreated: (id: string) => void }) {
       </div>
       <fieldset className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
         <legend className="mb-1">{t("mode")}</legend>
-        {([[STANDARD_FPS, "modeStandard"], [ECONOMY_FPS, "modeEconomy"]] as const).map(([f, k]) => (
+        {UPLOAD_MODES.map(([f, k]) => (
           <label key={f} className="flex items-center gap-2">
             <input type="radio" name="mode" checked={fps === f} onChange={() => setFps(f)} />
             {t(k)}

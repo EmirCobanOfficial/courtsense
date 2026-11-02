@@ -75,6 +75,8 @@
  },
  "tracking": {
   "fps15": {
+   "samObjects": 16,
+   "lastNewObjectAt": "14:15",
    "idsPerPlayer": [
     3,
     4
@@ -88,6 +90,8 @@
    "framesWithMoreThanTwoPeople": 0
   },
   "fps7_5": {
+   "samObjects": 16,
+   "lastNewObjectAt": "12:59",
    "idsPerPlayer": [
     5,
     2

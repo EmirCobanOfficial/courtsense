@@ -1,0 +1,136 @@
+{
+ "job": {
+  "base": "d8650763e4d0",
+  "test": "2ee0d9338624"
+ },
+ "framesSentToSam": {
+  "fps15": 10688,
+  "fps7_5": 5344
+ },
+ "costUsd": {
+  "fps15": 2.14,
+  "fps7_5": 1.07
+ },
+ "metrics": {
+  "fps15": [
+   {
+    "distanceM": 567,
+    "avgSpeed": 0.92,
+    "peakSpeed": 2.01,
+    "behindBaseline": 0.671,
+    "coverage": 0.921,
+    "depthNoiseM": 0.11,
+    "reliable": true
+   },
+   {
+    "distanceM": 650.2,
+    "avgSpeed": 0.98,
+    "peakSpeed": 3.07,
+    "behindBaseline": 0.719,
+    "coverage": 0.99,
+    "depthNoiseM": 0.43,
+    "reliable": false
+   }
+  ],
+  "fps7_5": [
+   {
+    "distanceM": 564.9,
+    "avgSpeed": 0.92,
+    "peakSpeed": 2.01,
+    "behindBaseline": 0.671,
+    "coverage": 0.922,
+    "depthNoiseM": 0.13,
+    "reliable": true
+   },
+   {
+    "distanceM": 533.2,
+    "avgSpeed": 0.98,
+    "peakSpeed": 2.95,
+    "behindBaseline": 0.743,
+    "coverage": 0.816,
+    "depthNoiseM": 0.55,
+    "reliable": false
+   }
+  ],
+  "fps7_5Simulated": [
+   {
+    "distanceM": 559.7,
+    "avgSpeed": 0.91,
+    "peakSpeed": 2,
+    "behindBaseline": 0.671,
+    "coverage": 0.921,
+    "depthNoiseM": 0.12,
+    "reliable": true
+   },
+   {
+    "distanceM": 641.1,
+    "avgSpeed": 0.97,
+    "peakSpeed": 2.98,
+    "behindBaseline": 0.696,
+    "coverage": 0.992,
+    "depthNoiseM": 0.48,
+    "reliable": false
+   }
+  ]
+ },
+ "tracking": {
+  "fps15": {
+   "samObjects": 16,
+   "lastNewObjectAt": "14:15",
+   "idsPerPlayer": [
+    3,
+    4
+   ],
+   "trackPieces": [
+    19,
+    7
+   ],
+   "idsOnBothSides": 0,
+   "idsTradedBetweenPlayers": 0,
+   "framesWithMoreThanTwoPeople": 0
+  },
+  "fps7_5": {
+   "samObjects": 16,
+   "lastNewObjectAt": "12:02",
+   "idsPerPlayer": [
+    5,
+    3
+   ],
+   "trackPieces": [
+    16,
+    3
+   ],
+   "idsOnBothSides": 2,
+   "idsTradedBetweenPlayers": 1,
+   "framesWithMoreThanTwoPeople": 547
+  }
+ },
+ "sameInstants": {
+  "A": {
+   "framesBoth": 4614,
+   "missedAt75": 4,
+   "missedAt15": 15,
+   "rawDiffRmsM": 0.07,
+   "smoothedDiffRmsM": 0.07
+  },
+  "B": {
+   "framesBoth": 4080,
+   "missedAt75": 889,
+   "missedAt15": 15,
+   "rawDiffRmsM": 0.93,
+   "smoothedDiffRmsM": 0.64
+  }
+ },
+ "handMarkedEvenFrames": {
+  "A": {
+   "n": 35,
+   "rmse15": 0.4,
+   "rmse7_5": 0.4
+  },
+  "B": {
+   "n": 21,
+   "rmse15": 1.07,
+   "rmse7_5": 1.11
+  }
+ }
+}

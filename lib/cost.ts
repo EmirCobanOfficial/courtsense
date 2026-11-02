@@ -4,7 +4,7 @@ export const SAM_USD_PER_FRAME = 0.2 / 1000; // $0.20 per 1,000 frames (Meta Mod
 export const SAM_MIN_FRAMES = 50; // a video request is billed for at least 50 frames
 export const MAX_FRAMES = 15000; // frames one SAM 3.1 request takes
 export const STANDARD_FPS = 15;
-export const ECONOMY_FPS = 7.5; // half the frames: positions as accurate, distance and peak speed read 1-5% lower (README)
+export const ECONOMY_FPS = 7.5; // half the frames; not offered on the upload screen: one of two real runs lost a player (README)
 
 // The frame rate a request asks for: Standard when unset; anything but the two modes is refused (null).
 export const parseFps = (v: unknown): number | null =>

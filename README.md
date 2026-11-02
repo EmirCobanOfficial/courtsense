@@ -51,7 +51,7 @@ A club coach films practice with one fixed camera behind the baseline. CourtSens
 ## How it works
 
 ```
-video ──ffmpeg (1080p; 15 fps Standard, 7.5 fps Economy)──▶ SAM 3.1 "tennis player" ──▶ tracks.json (boxes per object id per frame)
+video ──ffmpeg (1080p, 15 fps)────────────────────────────▶ SAM 3.1 "tennis player" ──▶ tracks.json (boxes per object id per frame)
                                                                    │
             4 calibration clicks ──▶ homography (image px → court m)
                                                                    ▼
@@ -70,7 +70,7 @@ Details that matter for accuracy:
   - For a rough player, each zone share comes with a range: the time they were clearly in the zone, and the time they could have been.
   - The agent and the report say when a value is rough. Left / right stays reliable.
 - **Tracking hygiene.** People outside the court (benches, the next court) are filtered by position; SAM sometimes hands a player's id to someone else later, so each id only counts inside the frame span where it belonged to that player. If SAM trades the two players' ids after they cross in the image, an id whose box leaves its player's reach for the other player's is matched again (no trade happened in our session; a test covers it). Boxes cut by a frame edge are dropped.
-- **Cost.** SAM 3.1 video is $0.20 per 1,000 frames: a 12-minute session at 15 fps (10,688 frames) costs about $2.14. Only the chosen part of the video is sent, and results are cached on disk, so re-uploading the same file never pays twice. Economy mode (7.5 fps) costs half; see "Fewer frames" below.
+- **Cost.** SAM 3.1 video is $0.20 per 1,000 frames: a 12-minute session at 15 fps (10,688 frames) costs about $2.14. Only the chosen part of the video is sent, and results are cached on disk, so re-uploading the same file never pays twice. A 7.5 fps mode would cost half, but it is not offered for now; see "Fewer frames" below.
 
 ## The coach assistant
 
@@ -123,25 +123,45 @@ After submission we measured positions against feet marked by hand on our coach'
 
 Notes:
 - Player A's error is mostly a difference in definition: the app's foot point is the bottom of the box (the front foot), the hand mark is between the feet.
-- The demo video was last updated on Nov 2, before Economy mode was added: its upload screen has no mode choice, and everything it shows is Standard (15 fps), still the default. The video submitted on Oct 28 is at https://youtu.be/C0gcC3CdusI; there Player B's distance reads 752 m, now about 650 m. Player A's numbers did not change.
+- The demo video was last updated on Nov 2. Everything it shows is Standard (15 fps), the only mode the app offers; since then the upload screen also names the mode and shows the estimated SAM 3.1 cost before upload. The video submitted on Oct 28 is at https://youtu.be/C0gcC3CdusI; there Player B's distance reads 752 m, now about 650 m. Player A's numbers did not change.
 - Details and limits are in [validate/README.md](validate/README.md).
 
-### Fewer frames: a real 7.5 fps run
+### Fewer frames: two real 7.5 fps runs
 
-SAM bills per frame, so we sent the same session to SAM 3.1 again at 7.5 fps: every second frame of the 15 fps clip (`validate/fps-test.ts`). Frame k of that run is frame 2k of the baseline, so both compare at the same instants.
+SAM bills per frame, so we sent the same session to SAM 3.1 twice more at 7.5 fps, for half the cost:
 
-| | 15 fps (default) | 7.5 fps |
-|---|---|---|
-| Frames sent to SAM, cost | 10,688, $2.14 | 5,344, $1.07 |
-| Identity swaps (an id crossing the net or moving to the other player) | 0 | 0 |
-| SAM ids per player, A / B (SAM lost the player and gave a new id) | 3 / 4 | 5 / 2 |
-| Frames with the player tracked, A / B | 92.1% / 99.0% | 92.0% / 99.2% |
-| Position error on hand-marked frames, A / B (the even ones: 35 / 26) | 0.40 m / 1.05 m | 0.40 m / 1.05 m |
-| Player A: distance, peak speed | 567 m, 2.01 m/s | 561 m (−1.1%), 2.00 m/s |
-| Player B (rough): distance, peak speed | ~650 m, ~3.07 m/s | ~624 m (−4.0%), ~2.93 m/s (−4.6%) |
-| Time behind the baseline, A / B | 67% / ~72% | 67% / ~73% |
+- **Run 1** used every second frame of the 15 fps clip (`validate/fps-test.ts --run`).
+- **Run 2** was a live test of Economy mode: the original video uploaded through the app, which cut it to 7.5 fps itself (compared with `validate/fps-test.ts --job 2ee0d9338624`).
 
-At the same instants Player A's positions agree to 0.03 m and Player B's to 0.8 m (far-side depth). With half the samples, the measured path cuts a few more corners, so distance and peak speed read a little lower, most for the far player. The upload screen offers this as **Economy (7.5 fps)**, with **Standard (15 fps)** as the default, and shows the estimated SAM 3.1 cost before anything is sent (`lib/cost.ts`). Each mode keeps its own cached results, so a video analyzed in one mode never pays again in that mode.
+In both runs frame k falls at the same instant as frame 2k of the 15 fps baseline, so positions compare frame by frame. The numbers are in `validate/baseline/fps-7.5.json` and `validate/baseline/fps-7.5-2ee0d9338624.json`.
+
+| | 15 fps (Standard) | 7.5 fps, run 1 | 7.5 fps, run 2 (app) |
+|---|---|---|---|
+| Frames sent to SAM, cost | 10,688, $2.14 | 5,344, $1.07 | 5,344, $1.07 |
+| Frames with the player tracked, A / B | 92.1% / 99.0% | 92.0% / 99.2% | 92.2% / **81.6%** |
+| Player lost and never found again | none | none | **B, from 12:18 to the end** |
+| Ids that cross the net / are used for both players | 0 / 0 | 0 / 0 | 2 / 1 (extra tracks, not the two players trading ids) |
+| Position error on hand-marked frames, A / B¹ | 0.40 m / 1.05 m | 0.40 m / 1.05 m | 0.40 m / 1.11 m |
+| Player A: distance, peak speed | 567 m, 2.01 m/s | 561 m (−1.1%), 2.00 m/s | 565 m (−0.4%), 2.01 m/s |
+| Player B (rough): distance, peak speed | ~650 m, ~3.07 m/s | ~624 m (−4.0%), ~2.93 m/s (−4.6%) | **~533 m (−18%)**, ~2.95 m/s (−3.9%) |
+| Player A's fastest moment (what the assistant answers) | 6:44, 3.81 m/s | 6:44, 3.77 m/s | **5:01, 7.82 m/s (false)** |
+| SAM tracks (object ids) in the request; the last new one starts at | 16; 14:15 | 16; 12:59 | 16; 12:02 |
+
+¹ The even hand-marked frames: 35 for A, 26 for B. In run 2, B was not tracked on 5 of them; on the other 21, Standard's error is 1.07 m.
+
+What we verified in run 2, from the saved tracks and the app:
+- SAM returned no box on Player B from 12:18 to the end of the analyzed part (889 frames), although the Standard run tracks B there.
+- Each run used exactly 16 SAM tracks (object ids 0–15). The players needed several each, because SAM gives a new id when it loses and finds someone; the rest were outside the court and, in run 2, A's racket (below). No frame held more than 8 tracks at once. After the 16th track started, no new one started for the rest of the video.
+- From 4:08 to 5:57 SAM also tracked a small object beside Player A; in the frame we checked (4:30) it is A's racket. From 5:00 to 5:02 A's own box was cut off by the bottom edge of the frame, and the app drops such boxes, so the racket's box was taken as Player A. Its jumps produced the false 7.82 m/s.
+- Asked "Where did Player A run fastest?", the live assistant answered 5:01 at 7.82 m/s and marked it verified. The claim check compares answers with the tracking data, so it cannot catch a tracking error. The real fastest moment, 6:44, came second.
+- Where both runs tracked a player, positions at the same instants agree to 0.07 m for A and 0.93 m for B (run 1: 0.03 m and 0.8 m).
+
+Possible explanations, not confirmed:
+- Meta's SAM 3.1 docs say "Video tracks up to 16 objects per frame". We never saw more than 8 in a frame, but every request stopped at exactly 16 tracks. So SAM 3.1 seems to start at most 16 tracks per request, which would explain why no new track picked up Player B after theirs ended. Meta has not confirmed this.
+- Both 7.5 fps runs reached their 16th track earlier than Standard did. With half the frames, tracks may break more often and use up ids sooner, but three runs cannot show this.
+- Runs 1 and 2 differ in how the clip was made (from the 15 fps clip vs from the original video) and in SAM's own run-to-run variation. We cannot tell which made run 2 worse.
+
+Two real runs of the same video at 7.5 fps tracked differently, so this version does not offer Economy on the upload screen: Standard (15 fps) is the only mode. The code stays for later work: `lib/cost.ts`, the job's `fps`, the `fps` field of `POST /api/jobs`, and the tests. Jobs already analyzed in Economy still open, with a note that says what we found. The upload screen still shows the estimated SAM 3.1 cost before anything is sent, and a video analyzed before costs nothing again.
 
 ## Code map
 
@@ -154,7 +174,7 @@ At the same instants Player A's positions agree to 0.03 m and Player B's to 0.8 
 | `lib/claims.ts` | the claim check for every number in answers and reports |
 | `lib/transcribe.ts` | Muse Voice Transcribe for spoken questions (the route converts the recording to WAV with ffmpeg) |
 | `lib/card.ts` | the practice card: the prompt from the player's measured pattern in words, and the Muse Image call |
-| `lib/cost.ts` | SAM 3.1 pricing and the two modes, Standard (15 fps) and Economy (7.5 fps): the upload screen's estimate and the frame rate a job runs at |
+| `lib/cost.ts` | SAM 3.1 pricing: the upload screen's estimate and the frame rate a job runs at (Standard, 15 fps; Economy, 7.5 fps, is kept but not offered) |
 | `lib/model.ts`, `lib/fake-model.ts` | the Meta Model API client; a scripted local model for trying the UI without API calls |
 | `lib/report.ts` | Muse Spark coach report |
 | `lib/i18n.ts` | English / Turkish UI strings |
@@ -194,7 +214,8 @@ With `=bad` instead, every answer has a wrong number, so it shows as not verifie
 - With a low camera the far player's depth is rough: about 1 m of error on the hand-marked frames. The app marks it and gives ranges rather than guessing.
 - The error figures come from one session and one camera position. A different setup needs its own hand-marked frames.
 - Slow camera drift (gimbal pan) is not compensated yet.
-- One SAM request covers up to 15,000 frames: about 16.7 minutes of video in Standard (15 fps) and 33.3 minutes in Economy (7.5 fps).
+- One SAM request covers up to 15,000 frames: about 16.7 minutes of video at 15 fps.
+- Each of our three SAM 3.1 requests started exactly 16 tracks (object ids) and no more, even after a player was lost (see "Fewer frames"). A player whose track breaks after the 16th is not found again. Standard is exposed too: its 16th track started at 14:15, near the end of the analyzed part (14:19), so a longer or busier video can lose a player in either mode. Meta's docs give a limit of 16 objects per frame; the per-request cap is what our runs show, not a documented rule. Sending a long video as several SAM requests (the same price per frame) and joining the tracks would avoid it.
 
 ## Privacy
 

@@ -2,9 +2,11 @@
 // frames is half the cost; this checks what that does to tracking and to the metrics.
 // The 7.5 fps clip keeps every second frame of the 15 fps clip, so its frame k is the baseline's frame 2k: positions
 // compare frame for frame, and so do the hand-marked frames with an even index.
-// usage (from the repo root): node --env-file=.env.local validate/fps-test.ts [--run] [--save]
+// usage (from the repo root): node --env-file=.env.local validate/fps-test.ts [--run] [--save] [--job <id>]
 //   --run   makes the 7.5 fps job and sends it to SAM 3.1 (one request, about $1.07 for this session)
-//   --save  writes the comparison to validate/baseline/fps-7.5.json
+//   --save  writes the comparison to validate/baseline/fps-7.5.json (fps-7.5-<id>.json with --job)
+//   --job   compares another 7.5 fps job of this session instead, e.g. one uploaded in Economy mode through the app.
+//           Its clip is cut from the source at 7.5 fps, so its frame k is again the baseline's frame 2k in time.
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -13,11 +15,12 @@ import { jobDir, jobFile, processJob, readJob, readTracks, writeJob, type Job } 
 import { analyze, playerPositions, type Sample, type Tracks } from "../lib/metrics.ts";
 
 const BASE = "d8650763e4d0";
-const TEST = crypto.createHash("sha1").update(`fps-7.5:${BASE}`).digest("hex").slice(0, 12);
+const jobArg = process.argv.indexOf("--job");
+const TEST = jobArg > 0 ? process.argv[jobArg + 1] : crypto.createHash("sha1").update(`fps-7.5:${BASE}`).digest("hex").slice(0, 12);
 const base = readJob(BASE);
 if (!base?.calibration) throw new Error(`job ${BASE} with its calibration is needed on this machine`);
 
-if (process.argv.includes("--run") && !fs.existsSync(jobFile(TEST, "tracks.json"))) {
+if (process.argv.includes("--run") && jobArg < 0 && !fs.existsSync(jobFile(TEST, "tracks.json"))) {
   fs.mkdirSync(jobDir(TEST), { recursive: true });
   if (!fs.existsSync(jobFile(TEST, "clip.mp4"))) {
     execFileSync("ffmpeg", ["-v", "error", "-y", "-i", jobFile(BASE, "clip.mp4"), "-vf", "select=not(mod(n\\,2)),setpts=N/7.5/TB", "-r", "7.5",
@@ -52,7 +55,12 @@ function tracking(t: Tracks) {
   }
   for (const n of perFrame.values()) if (n > 2) crowded++;
   const ids = pos.map((p) => Object.keys(p.objectFrames));
+  // every object SAM tracked in the request (people off court too), and when the last new one first shows up
+  const firsts = Object.values(t.objects).filter((b) => b.length).map((b) => b[0][0]);
+  const at = base!.startSec + Math.max(...firsts) / t.fps;
   return {
+    samObjects: firsts.length,
+    lastNewObjectAt: `${Math.floor(at / 60)}:${String(Math.floor(at % 60)).padStart(2, "0")}`,
     idsPerPlayer: ids.map((x) => x.length),
     trackPieces: pos.map((p) => p.raw.length),
     idsOnBothSides: [...sides.values()].filter((s) => s.size === 2).length,
@@ -120,4 +128,4 @@ const out = {
   handMarkedEvenFrames: { A: { n: hand[0].e15.length, rmse15: rms(hand[0].e15), rmse7_5: rms(hand[0].e75) }, B: { n: hand[1].e15.length, rmse15: rms(hand[1].e15), rmse7_5: rms(hand[1].e75) } },
 };
 console.log(JSON.stringify(out, null, 1));
-if (process.argv.includes("--save")) fs.writeFileSync("validate/baseline/fps-7.5.json", JSON.stringify(out, null, 1) + "\n");
+if (process.argv.includes("--save")) fs.writeFileSync(`validate/baseline/fps-7.5${jobArg > 0 ? `-${TEST}` : ""}.json`, JSON.stringify(out, null, 1) + "\n");
