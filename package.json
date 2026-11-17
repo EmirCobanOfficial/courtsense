@@ -13,7 +13,7 @@
     "@meta-sam/parser": "^0.1.0",
     "@meta-sam/react": "^0.1.14",
     "@meta-sam/video": "^0.1.5",
-    "next": "16.4.3",
+    "next": "16.4.5",
     "openai": "^7.45.1",
     "react": "19.3.0",
     "react-dom": "19.3.0"
